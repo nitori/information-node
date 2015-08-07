@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
+import platform
 import re
 import sys
 import textwrap
@@ -140,13 +142,19 @@ parser.add_argument("action",
 
         [b]"enable-encrypt-password" <node-folder> <password>[/b] -
         as soon as any data arrives which needs to be saved to disk, encrypt
-        it with the given password as a key. Please note the password should
+        it with the given password as a key.
+        Gateways will still be allowed to process the data once before it gets
+        encrypted and stored.
+        Please note the password should
         be rather lengthy and random if you want to withstand brute-force
         decryption of an attacker getting somehow access to your encrypted
         information node storage contents on disk. The encryption is set up
         to be asymmetric, so you'll never need to submit the password just to
         start the node later or to add in more encrypted items - it will just
         be required to decrypt items.
+        Search performance for such files might generally be considerably
+        slower (or for the information node in overall if it contains a large
+        amount of such encrypted files).
         [b]SECURITY NOTICE:[/b] some
         very basic metadata like time of creation and a random id
         will still remain unencrypted for each data part to enable the
@@ -159,15 +167,17 @@ parser.add_argument("action",
         to complete. If the information node is terminated before this command
         completes, simply issue it again to make sure everything is decrypted.
 
-        [b]"enable-encrypt-node-target" <node-folder> <fingerprint> <cert>[/b]
+        [b]"enable-encrypt-target-node" <node-folder> <fingerprint> <cert>[/b]
         -
         as soon as any data arrives at this node from another node or from
         an information gateway, encrypt it before it gets written to disk
         in a way that allows decryption only with the private key
         information possessed and stored
-        with the node identified by <fingerprint> (which can run on any
+        with the target node identified by <fingerprint> (which can run on any
         other computer in this world - and doesn't need to be directly
         linked).
+        Gateways will still be allowed to process the data once before it gets
+        encrypted and stored.
         The node can and will still share the data with others according to
         the specified read/write access and remote links, but no node
         including
@@ -187,8 +197,8 @@ parser.add_argument("action",
         syncing protocol
         to operate properly.
 
-        [b]"disable-encrypt-node-target"[/b] <node-folder> -
-        disables the node-target encryption - but only for newly added
+        [b]"disable-encrypt-target-node"[/b] <node-folder> -
+        disables the target node encryption - but only for newly added
         items. This is because only the target node has the information to
         decrypt anything again, so it is impossible for this node to do this.
         Only if there is a sychronization from the target node for the
@@ -196,29 +206,36 @@ parser.add_argument("action",
         one, the files will be gradually synchronized back to an unencrypted
         state at this node.
 
-
         [b]"enable-gateway" <node-folder> <gateway-name> <options>[/b]
         - enable an automated gateway and provide the given set of
         options which are
-        gateway specific. (to know which options a gateway wants to have,
-        see [b]gateway-info[/b] below)
-        If you don't specify any options and the gateway was temporarily
-        stopped, it will relaunch with the last specified set of options.
+        gateway specific. For the options, see [b]gateway-usage[/b].
+        For a list of all possible gateways, see [b]gateway-list[/b].
+        If you don't specify any options and the gateway had already been
+        running, it will relaunch with the last specified set of options.
         [b]SECURITY NOTICE:[/b] the options will
         be stored inside the <node-folder> location [b]including
         passwords[/b] as plain text which some gateways require.
+        To wipe that info, see [b]remove-gateway[/b].
 
-        [b]"gateway-info" <node-folder> <gateway-name>[/b] -
-        print out whether this gateway
-        is currently enabled, and what sort of options it accepts in general.
-        [b]Omit the gateway name to list all available gateways.[/b]
+        [b]"gateway-list"[/b] - a list of the names of all available
+        gateways. Use "gateway-info" below for details on a specific gateway. 
 
-        [b]"disable-gateway" <node-folder> <gateway-name>[/b] - permanently
-        disable a gateway, erasing the stored options. If you need to
-        shutdown a
-        gateway temporarily, simply SIGTERM the respective information-node
-        daemon
-        processes.
+        [b]"gateway-usage" <gateway-name>[/b] -
+        print out what the gateway with this name does, how it works and
+        what options it takes for [b]enable-gateway[/b].
+
+        [b]"gateway-status" <node-folder> [gateway][/b] -
+        show the status of all the running gateways at the given node (or
+        with more details for the specific one with the given gateway name,
+        if given).
+
+        [b]"disable-gateway" <node-folder> <gateway-name>[/b] - temporarily
+        disable a gateway - this will still keep the last used options stored.
+        To get rid of all traces of a gateway, use [b]forget-gateway[/b].
+
+        [b]"forget-gateway" <node-folder> <gateway-name>[/b] - disable the
+        given gateway if enabled, and then wipe all stored options data.
 
         [b]"export-cert" <node-folder> <file-to-write-to>[/b] -
         export the certificate file required for [b]encrypt-for-target[/b].
@@ -251,4 +268,141 @@ if len(" ".join(sys.argv[1:]).strip()) == 0:
     parser.print_usage()
     sys.exit(1)
 args = parser.parse_args()
+
+def check_if_node_dir(path, allow_new=False):
+    if os.path.exists(path):
+        if not os.path.isdir(path):
+            print("error: information-node: specified node folder is " +\
+                "not a directory", file=sys.stderr)
+            return False
+        contents = os.listdir(path)
+        if len(contents) == 0:
+            # empty directory.
+            if allow_new:
+                return True
+            else:
+                print("error: information-node: specified node folder is " +\
+                    "not a valid information node", file=sys.stderr)
+                return False
+        else:
+            # check if a valid information node:
+            if not os.path.exists(os.path.join(path, "storage")):
+                print("error: information-node: specified node folder is " +\
+                    "not a valid information node", file=sys.stderr)
+                return False
+            return True
+    else:
+        if not allow_new:
+            print("error: information-node: specified node folder " +\
+                "doesn't exist", file=sys.stderr)
+            return False
+
+        # clean up path a bit:
+        path = os.path.normpath(os.path.abspath(path))
+        if path.startswith("//"):
+            path = path[1:]
+        while path.endswith("/"):
+            path = path[:-1]
+        while (platform.system().lower() == "windows" and\
+                path.endswith("\\")):
+            path = path[:-1]
+
+        # find out whether the parent dir exists:
+        base_dir = os.path.dirname(path)
+        if not os.path.exists(base_dir) or not os.path.isdir(base_dir):
+            print("error: information-node: cannot create node at " +\
+                "specified location because parent directory doesn't"
+                " exist: " + str(base_dir), file=sys.stderr)
+            return False
+
+        # create directory as new empty dir:
+        try:
+            os.mkdir(path)
+        except OSError as e:
+            print("error: information-node: cannot create node at " +\
+                "specified location: " + str(e))
+            return False
+        return True
+
+if args.action == "node":
+    args = args.argument
+    if len(args) < 1:
+        print("error: information-node: too few arguments for " +\
+            "action: node", file=sys.stderr)
+        sys.exit(1)
+    
+    # get interface info:
+    interface_info = ""
+    if len(args) >= 2:
+        interface_info = args[1]
+
+    # see if interface info is valid:
+    listen_ip = "::0"
+    listen_port = 38950
+    if len(interface_info) > 0:
+        colon_pos = interface_info.rfind(":")
+        ip_part = ""
+        port = None
+        if colon_pos < 0:
+            if interface_info.find(".") < 0:
+                print("error: information-node: supplied listen interface "+\
+                    "is not a valid ip address", file=sys.stderr)
+                sys.exit(1)
+            ip_part = interface_info
+        else:
+            port_str = None
+            if interface_info.find(":") != colon_pos:
+                # must be ipv6. verify proper square brackets:
+                if (not interface_info[0] == "[") or \
+                        (not interface_info[colon_pos - 1] == "]"):
+                    # not []: but maybe it's [..:..:..]?
+                    if not interface_info.endswith("]"):
+                        print("error: information-node: supplied listen " +\
+                            "interface is not a valid ip address - did you "+\
+                            "use square brackets for ipv6?", file=sys.stderr)
+                        sys.exit(1)
+                    ip_part = interface_info[1:-1]
+                else:
+                    ip_part = interface_info[1:colon_pos - 1]
+                    port_str = interface_info[colon_pos + 1:]
+            else:
+                ip_part = interface_info[0:colon_pos]
+                port_str = interface_info[colon_pos + 1:]
+            if port_str != None:
+                try:
+                    port = int(port_str)
+                except ValueError:
+                    print("error: information-node: supplied listen " +\
+                        "interface has invalid port - not a number",\
+                        file=sys.stderr)
+                    sys.exit(1)
+        # ok, check if this is a valid ip and port range:
+        if port != None and (port < 1 or port > 65535):
+            print("error: information-node: supplied listen interface " +\
+                "has invalid port - exceeds valid port range",
+                file=sys.stderr) 
+            sys.exit(1)
+
+        # check for valid ip:
+        try:
+            import ipaddress
+            adr = ipaddress.ip_address(ip_part)
+        except ValueError:
+            print("error: information-node: supplied listen interface "+\
+                "has invalid address - not a valid IP address")
+            sys.exit(1)
+
+        listen_ip = ip_part
+        if port != None:
+            listen_port = port
+
+    # check if node directory is valid:
+    if not check_if_node_dir(args[0], allow_new=True):
+        sys.exit(1)
+         
+    # check if node dir is empty and we need to initialise it:
+    if len(os.listdir(args[0])) == 0:
+        print("Creating new information node at location " + args[0] + "...")
+        
+
 
