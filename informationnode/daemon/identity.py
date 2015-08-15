@@ -43,15 +43,15 @@ class Identity(object):
         if from_file == None:
             # generate a new pair
             rng = Random.new().read
-            key = RSA.generate(4096, rng)
+            key = RSA.generate(4096 * 2, rng)
             self.public_key = IdentityPublicKey(key)
             self.private_key = IdentityPrivateKey(key)
         else:
             # read from file:
-            f = open(from_file, "wb")
+            f = open(from_file, "rb")
             contents = f.read(4096 * 1024)  # no more than 4mb
             f.close()
-            key = RSA.importKey(f.read())
+            key = RSA.importKey(contents.decode("utf-8", "ignore"))
             self.public_key = IdentityPublicKey(key)
             if key.has_private():
                 self.private_key = IdentityPrivateKey(key)

@@ -5,9 +5,12 @@ import ctypes
 import os
 import platform
 import re
+import socket
 import sys
 import textwrap
+import time
 
+from informationnode.daemon.daemon import Daemon
 from informationnode.daemon.identity import Identity
 
 class DoubleLineBreakFormatter(argparse.HelpFormatter):
@@ -82,6 +85,11 @@ action_info_list = [
     Allow the remote node with
     the given fingerprint to access all data in the local node located at
     <node-folder> with read-only permission.
+
+    [b]You can enforce that the target node only gets your data encrypted
+    (so you can use it as a backup location that cannot actually access or
+    reveal the data)[/b] - see [b]allow-read --help[/b] for details on
+    how to do that.
 
     When another node has read access to items matching a given item
     mask, and this node has write access to that other node, the items
@@ -321,13 +329,16 @@ faq_text = textwrap.dedent('''\
 
     Information nodes simply store
     data and share it amongst themselves when linked with each other
+    over encrypted connections
     according
-    read/write access over encrypted connections
-    (creating an autonomous data sharing cloud, similar to e.g.
-    syncthing). This data usually cannot be accessed directly,
+    to specified read/write access rules. This creates
+    an autonomous data sharing cloud, similar to e.g.
+    syncthing or Dropbox.
+    The data in such a node usually cannot be accessed directly,
     it is hidden in a black box data structure optimized for fast access
     and possibly encrypted - therefore, think of it
     as something similar to git's bare repository if you want.
+    However, it can be accessed using various different ways, see below.
 
     [b]== What sort of data does an information node store? ==[/b]
 
@@ -469,7 +480,7 @@ if args.faq:
 def check_if_node_dir(path, allow_new=False):
     if os.path.exists(path):
         if not os.path.isdir(path):
-            print("error: information-node: specified node folder is " +\
+            print("information-node: error: specified node folder is " +\
                 "not a directory", file=sys.stderr)
             return False
         contents = os.listdir(path)
@@ -478,20 +489,20 @@ def check_if_node_dir(path, allow_new=False):
             if allow_new:
                 return True
             else:
-                print("error: information-node: specified node folder is " +\
+                print("information-node: error: specified node folder is " +\
                     "not a valid information node", file=sys.stderr)
                 return False
         else:
             # check if a valid information node:
             if not os.path.exists(os.path.join(path, "storage")) or \
                     not os.path.exists(os.path.join(path, "identity.secret")):
-                print("error: information-node: specified node folder is " +\
+                print("information-node: error: specified node folder is " +\
                     "not a valid information node", file=sys.stderr)
                 return False
             return True
     else:
         if not allow_new:
-            print("error: information-node: specified node folder " +\
+            print("information-node: error: specified node folder " +\
                 "doesn't exist", file=sys.stderr)
             return False
 
@@ -508,7 +519,7 @@ def check_if_node_dir(path, allow_new=False):
         # find out whether the parent dir exists:
         base_dir = os.path.dirname(path)
         if not os.path.exists(base_dir) or not os.path.isdir(base_dir):
-            print("error: information-node: cannot create node at " +\
+            print("information-node: error: cannot create node at " +\
                 "specified location because parent directory doesn't"
                 " exist: " + str(base_dir), file=sys.stderr)
             return False
@@ -517,7 +528,7 @@ def check_if_node_dir(path, allow_new=False):
         try:
             os.mkdir(path)
         except OSError as e:
-            print("error: information-node: cannot create node at " +\
+            print("information-node: error: cannot create node at " +\
                 "specified location: " + str(e))
             return False
         return True
@@ -525,7 +536,7 @@ def check_if_node_dir(path, allow_new=False):
 try:
     from Crypto.PublicKey import RSA
 except ImportError:
-    print("error: information-node: PyCrypto is not available. "+\
+    print("information-node: error: PyCrypto is not available. "+\
         "Please install it for Python 3 and try again.")
     sys.exit(1)
 
@@ -536,25 +547,21 @@ if args.action == "node":
         formatter_class=DoubleLineBreakFormatter)
     subparser.add_argument("node-folder",
         help="the location where the node is stored or should be created at")
-    subparser.add_argument("interface[:port]", nargs="?",
+    subparser.add_argument("interface[:port]", nargs="?", default="",
         help="interface to listen at for remote connections "+\
             "for links (optional)")
-    subparser.add_argument("foreground", default=False,
+    subparser.add_argument("--foreground", default=False,
         action='store_true',
         help="don't daemonize the data server and run it in another "+\
             "thread/process. Instead, run it in this terminal in foreground")
     args = subparser.parse_args(subcmd_args)
-    args.interface = getattr(args, "interface[:port]") 
+    setattr(args, "node_folder", getattr(args, "node-folder"))
+    setattr(args, "interface", getattr(args, "interface[:port]"))
 
-    if len(args.argument) < 1:
-        print("error: information-node: too few arguments for " +\
-            "action: node", file=sys.stderr)
-        sys.exit(1)
-    
     # get interface info:
     interface_info = ""
-    if len(args.argument) >= 2:
-        interface_info = args.argument[1]
+    if len(args.interface) > 0:
+        interface_info = args.interface
 
     # see if interface info is valid:
     listen_ip = "::0"
@@ -565,7 +572,7 @@ if args.action == "node":
         port = None
         if colon_pos < 0:
             if interface_info.find(".") < 0:
-                print("error: information-node: supplied listen interface "+\
+                print("information-node: error: supplied listen interface "+\
                     "is not a valid ip address", file=sys.stderr)
                 sys.exit(1)
             ip_part = interface_info
@@ -577,7 +584,7 @@ if args.action == "node":
                         (not interface_info[colon_pos - 1] == "]"):
                     # not []: but maybe it's [..:..:..]?
                     if not interface_info.endswith("]"):
-                        print("error: information-node: supplied listen " +\
+                        print("information-node: error: supplied listen " +\
                             "interface is not a valid ip address - did you "+\
                             "use square brackets for ipv6?", file=sys.stderr)
                         sys.exit(1)
@@ -592,13 +599,13 @@ if args.action == "node":
                 try:
                     port = int(port_str)
                 except ValueError:
-                    print("error: information-node: supplied listen " +\
+                    print("information-node: error: supplied listen " +\
                         "interface has invalid port - not a number",\
                         file=sys.stderr)
                     sys.exit(1)
         # ok, check if this is a valid ip and port range:
         if port != None and (port < 1 or port > 65535):
-            print("error: information-node: supplied listen interface " +\
+            print("information-node: error: supplied listen interface " +\
                 "has invalid port - exceeds valid port range",
                 file=sys.stderr) 
             sys.exit(1)
@@ -608,7 +615,7 @@ if args.action == "node":
             import ipaddress
             adr = ipaddress.ip_address(ip_part)
         except ValueError:
-            print("error: information-node: supplied listen interface "+\
+            print("information-node: error: supplied listen interface "+\
                 "has invalid address - not a valid IP address")
             sys.exit(1)
 
@@ -616,44 +623,49 @@ if args.action == "node":
         if port != None:
             listen_port = port
 
+    node_folder = args.node_folder
+
     # check if node directory is valid:
-    if not check_if_node_dir(args[0], allow_new=True):
+    if not check_if_node_dir(node_folder, allow_new=True):
         sys.exit(1)
          
     # check if node dir is empty and we need to initialise it:
-    if len(os.listdir(args[0])) == 0:
-        print("Creating new information node at location " + args[0] + "...")
+    if len(os.listdir(node_folder)) == 0:
+        print("information-node: info: " +\
+            "creating new information node at location " +\
+            node_folder + "...")
 
         # create item storage directory:
-        os.mkdir(os.path.join(args[0], "storage"))
+        os.mkdir(os.path.join(node_folder, "storage"))
 
         # create and store a new identity:
         identity = Identity()
-        identity.save_to_file(os.path.join(args[0], "identity.secret"))
+        identity.save_to_file(os.path.join(node_folder, "identity.secret"))
 
         # create log directory:
-        os.mkdir(os.path.join(args[0], "logs"))
+        os.mkdir(os.path.join(node_folder, "logs"))
 
     # check if pid file exists:
-    if os.path.exists(os.path.join(args[0], "pidfile")):
+    if os.path.exists(os.path.join(node_folder, "pidfile")):
         # open it up to check for the running process:
-        f = os.path.join(args[0], "pidfile")
+        f = open(os.path.join(node_folder, "pidfile"), "rb")
         contents = f.read()
         f.close()
+
         # check if valid pid:
         try:
             pidnumber = int(contents)
         except ValueError:
             pidnumber = None
         if pidnumber == None or pidnumber < 1:
-            print("error: information-node: pidfile has invalid contents. "+\
+            print("information-node: error: pidfile has invalid contents. "+\
                 "Check if this node has already a process running, and if "+\
                 "you are sure this is not the case, remove the pidfile.",\
                 file=sys.stderr)
             sys.exit(1)
 
         # check if a process with this pid is running:
-        def check_process_running(self, pid):
+        def check_process_running(pid):
             if platform.system() == "windows":
                 PROCESS_QUERY_INFROMATION = 0x1000
                 processHandle = ctypes.windll.kernel32.OpenProcess(
@@ -671,25 +683,86 @@ if args.action == "node":
                 else:
                     return True
         if check_process_running(pidnumber):
-            print("info: information-node: this information node is " +\
-                "already running with process id " + str(pidnumber) +\
-                ". nothing to do.", file=sys.stderr)
+            print("information-node: info: data server for this node is " +\
+                "running with pid " + str(pidnumber))
+            print("information-node: info: " +\
+                "nothing to do.", file=sys.stderr)
             sys.exit(0)
         
-        print("warning: information-node: removing stale " +\
+        print("information-node: warning: removing stale " +\
             "pidfile with pid: " + str(pidnumber))
-        os.remove(os.path.join(args[0], "pidfile"))
-    
-    print("Launching information-node daemon...")
-    if platform.system() == "windows":
+        os.remove(os.path.join(node_folder, "pidfile"))
+
+    print("information-node: info: " +\
+        "preparing communications socket for daemon...")
+
+    # on unix, create api file socket at this point (for viewer access):
+    if platform.system().lower() != "windows":
+        if os.path.exists(os.path.join(node_folder, "access_api.sock")):
+            print("information-node: warning: removing stale file socket",
+                file=sys.stderr)
+            os.remove(os.path.join(node_folder, "access_api.sock"))
+        api_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        api_socket.bind(os.path.join(node_folder, "access_api.sock"))
+
+    # on windows, open up api socket at any port, and write port to file:
+    if platform.system().lower() == "windows" and args.foreground:
+        api_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        api_socket.bind(("::0", 0))
+        port = api_socket.getsockname()[1]
+        f = open(os.path.join(node_folder, "access_api.port"), "wb")
+        f.write(str(port).encode("utf8", "ignore"))
+        f.close()
+
+    # a helper function to wait until a pidfile was made:
+    def wait_for_pid_file():
+        while True:
+            if not os.path.exists(os.path.join(node_folder, "pidfile")):
+                time.sleep(0.5)
+            else:
+                break
+
+    # handle daemonizing:
+    print("information-node: info: launching information-node daemon...")
+    if platform.system().lower() == "windows":
         # on windows we cannot fork, so we need to run ourselves again as
         # a new detached process (unless we _are_ that detached process):
         if not args.foreground:
             DETACHED_PROCESS = 8
             subprocess.Popen([sys.executable, __file__, 
-                "node", "--foreground", args[0]],
+                "node", "--foreground", node_folder],
                 creationflags=DETACHED_PROCESS,
                 close_fds=True)
+            wait_for_pid_file()
+            print("information-node: info: data server is running!")
+            sys.exit(0)
+    else:
+        # this should be a unix system:
+        # fork should be available and work as expected. -> fork
+        if not args.foreground:
+            try:
+                pid = os.fork()
+                if pid > 0:
+                    # this is the parent process. exit:
+                    wait_for_pid_file()
+                    print("information-node: info: data server is running!")
+                    sys.exit(0)
+            except OSError as e:
+                print("information-node: error: fork failed.", file=sys.stderr)
+                sys.exit(1)
+            # disable stdin/stdout:
+            devnull = [os.open(os.devnull, os.O_RDWR) for x in [1, 2]]
+            os.dup2(devnull[0], 1)
+            os.dup2(devnull[1], 2)
+
+    # create a pid file:
+    pid_bytes = str(os.getpid()).encode("utf-8", "ignore")
+    f = open(os.path.join(node_folder, "pidfile"), "wb")
+    f.write(pid_bytes)
+    f.close()
+
+    # if we arrive here, we are in the daemon process/thread. run daemon:
+    Daemon().run(api_socket)
 else:
     if args.action in action_info:
         print("Dear user,")
@@ -700,10 +773,10 @@ else:
         print("")
         print("Best regards,\nThe developers")
         print("")
-        print("error: information-node: action UNIMPLEMENTED: " + args.action,
+        print("information-node: error: action UNIMPLEMENTED: " + args.action,
             file=sys.stderr)
         sys.exit(1)
-    print("error: information-node: unknown action: " + args.action,
+    print("information-node: error: unknown action: " + args.action,
         file=sys.stderr)
 
 
