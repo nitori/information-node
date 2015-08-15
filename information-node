@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
 import argparse
+import ctypes
 import os
 import platform
 import re
 import sys
 import textwrap
+
+from informationnode.daemon.identity import Identity
 
 class DoubleLineBreakFormatter(argparse.HelpFormatter):
     """ Retains double line breaks/paragraphs """
@@ -23,9 +26,10 @@ class DoubleLineBreakFormatter(argparse.HelpFormatter):
         "\033[1m").replace("[/b]", "\033[21m")
 
 parser = argparse.ArgumentParser(description=\
-    "[b]Tool to create and manage information nodes.[/b]\n" +\
-    "\nEncrypted file sharing and cloud messaging! Yay!\n\n" +\
-    "[b]What is an information node?[/b] "+\
+    "Tool to create and manage information nodes, licensed as "+\
+    "GPLv3+.\n\n\n\n" +\
+\
+    "[b]== What is an information node? ==[/b]\n\n"+\
     "Information nodes simply store "+\
     "data and share it amongst themselves when linked with each other "+\
     "according "+\
@@ -35,25 +39,30 @@ parser = argparse.ArgumentParser(description=\
     "it is hidden in a binary blob optimized for fast access "+\
     "and possibly encrypted - therefore, think of it"+\
     " as something similar to git's bare repository if you want.\n\n"+\
-    "[b]What sort of data does an information node store?[/b] "\
-    "Nodes are meant to store any sort of data you might have, like "+\
+\
+    "[b]== What sort of data does an information node store? ==[/b]\n\n"\
+    "A: Nodes are meant to store any sort of data you might have, like "+\
     "e-mail, Instant Messaging, personal file cloud etc. Unlike "+\
     "other synchronisation tools like rsync, dropbox, syncthing, " +\
     "seafile, .. it is NOT specifically limited "+\
     "to files only but includes abstract objects that can also "+\
     "model messages/e-mails/.. and tools to manage them.\n\n"+\
-    "[b]Why not just use plain files?[/b] " +\
+\
+    "[b]== Why not just use plain files? ==[/b]\n\n" +\
     "Information nodes allow non-file contents like e-mails, chat "+\
     "messages to be stored. It can also sync all stored files, e-mails, "+\
     "... to other nodes and encrypt them, giving you a true distributed " +\
     "cloud setup with one simple command line tool.\n\n"+\
-    "[b]Where is the data of a node stored?[/b] " +\
+\
+    "[b]== Where is the data of a node stored? ==[/b]\n\n" +\
     "It is all stored in the given node folder (see commands below)." +\
     " Nothing is stored outside except some basic preferences for " +\
     "the graphical node contents viewer if you use that one. " +\
     "The data is only shared exactly in the fashion specified by "+\
     "you, and if you want also encrypted.\n\n"+\
-    "[b]How do I access and look at the data, or add new data?[/b] "+\
+\
+    "[b]== How do I access and look at the data, or add "+\
+    "new data? ==[/b]\n\n"+\
     "If you just want to browse the data and possibly do minor "+\
     "modifications, use the information node client (separate binary) "+\
     "to access and review"+\
@@ -68,206 +77,330 @@ parser = argparse.ArgumentParser(description=\
     " A file gateway also allows you to map your files to a regular "+\
     "folder on your disk to have your own private dropbox/syncthing/btsync "+\
     "equivalent.\n\n"+\
-    "[b]Why should I use this?[/b] " +\
+\
+    "[b]== Why should I use this? ==[/b]\n\n" +\
     "If you would like something like Dropbox or Syncthing for your "+\
     "e-mail or Instant Messaging messages too, this tool is for you. "+\
     "If you want to have something like Syncthing but with remote nodes "+\
     "that only provide backup locations and are fully encrypted without "+\
     "the secure decryption key ever being on the remote location, this is"+\
     " for you as well.\n\n" +\
-    "[b]Is this system secure?[/b] "+\
-    "Information nodes use strong RSA-based PGP async encryption for "+\
-    "identification and communication, and with [b]encrypt-for-target[/b]"+\
-    " (see below) you can have data in your cloud that cannot be "+\
-    "decrypted by any of the nodes which store it " +\
-    "except for some specified local one which can be "+\
-    "safe on your local laptop - however, even your laptop can be "+\
-    "compromised and software, including this one, has bugs. "+\
-    "Remember, one rogue node with write access can do a lot of damage. "+\
-    "So while we hope it helps you to securely share your data, don't "+\
-    "trust it too much.\n\n" +\
-    "[b]What happens about data loss?[/b] "+\
+\
+    "[b]== Is this system secure? ==[/b]\n\n"+\
+    "This depends. [b]encrypt-password[/b] data will be as secure as your "+\
+    "chosen password is, when subject to a brute force attack. " +\
+    "(and trojans could sniff the password when you enter it in the viewer "+\
+    "to look at the data yourself, so make sure your machine is clean) " +\
+    "[b]encrypt-for-node[/b] data will be hardened with RSA/AES and will "+\
+    "be rather hard to steal and decrypt - unless an attacker gets their "+\
+    "hands on the node directory contents of the [b]target node[/b] (the "+\
+    "node which can decrypt it with its cryptographic identity), in which "+\
+    "case it'll be trivial to open up. It is therefore as safe as the " +\
+    "respective target node is kept."+\
+    "Also, always remember, [b]one rogue node[/b] with write access can "+\
+    "do a lot of damage. (even with read access when it steals your data) "+\
+    "In the end, this software can also always have bugs. The code is "+\
+    "open-source, if you have the knowledge please help review and secure "+\
+    "it."+\
+    "[b]What happens in case of data loss (dead hard disk etc.)?[/b] "+\
     "There is versioning support (configurable through the client) which "+\
-    "should help against file corruption, "+\
-    "and if you have enough nodes to distribute the data you should be "+\
-    "fine if one of them dies. If you fear you will lose the only node "+\
+    "should help a bit against file corruption if you notice it "+\
+    "early enough. "+\
+    "If a node suffers sudden catastrophic failure, you should be fine if "+\
+    "you had the data distributed to at least one other node."+\
+    "If you fear you will lose the only node "+\
     "being able to decrypt some of your data as per "+\
     "[b]encrypt-for-target[/b], use [b]export-identity[/b] (see below) " +\
-    "to backup its private key."+\
-    "[b]How do I get started?[/b] "+\
-    "Create a node (see the action [b]node[/b] below), then get the "+\
-    "information node client (either cli version or graphical) and open "+\
-    "it to add/review data. "+\
+    "to backup its private key.\n\n"+\
+\
+    "[b]== How do I get started? ==[/b]\n\n"+\
+    "Create a node (see the action [b]\"node\"[/b] below), then "+\
+    "get connected to it with [b]information-node-viewer[/b]. "+\
+    "The viewer will also assist you setting up "+\
+    "gateways to interface with IMAP, a folder like dropbox, .. "+\
     "Later on, add and link remote nodes as you see fit.",
     formatter_class=DoubleLineBreakFormatter)
+action_info_list = [
+    ("node", "<node-folder> [<[interface:]port>]",
+    "enable the specified node (creates it implicitly)",
+    textwrap.dedent('''\
+    Enable the given node by
+    launching the data server. It handles the gateways and
+    allows you to connect the
+    viewer, and synchronizes with other connected nodes.
+    
+    This will create a new information node at the given
+    location if it doesn't exist. You should launch the data server with the
+    user account that owns the according data folder.
+
+    You can optionally
+    allow remote access from other nodes (see "link" below) through the
+    specified listen interface - per default, it is disabled.
+    ''')),
+    ("fingerprint", "<node-folder>",
+    "show fingerprint which represents the node's cryptographic identity",
+    textwrap.dedent('''\
+    Show the fingerprint of the
+    node stored at the given folder. This represents the identity of this
+    particular node. It is safe to make this information public - it is
+    enough to identify a node, but won't allow to decrypt the node's
+    data''')),
+    ("link", "<target-host[:target-port]>",
+    "link to remote node enabled at given interface",
+    textwrap.dedent('''\
+    Add a connection to a remote
+    node. This connection will be continuously attempted to establish by
+    the local data server if it fails or breaks up, until you [b]unlink[/b].
+    The conneciton is also remembered over data server restarts.
+
+    Please note that unless "allow-read" or "allow-write" (see
+    below) was used to enable permissions in any direction, the nodes
+    will not be able to share or access any data from each other.''')),
+    ("unlink", "<target-host[:target-port]>",
+    "unlink from the given remote node",
+    textwrap.dedent('''\
+    Remove the connection from a remote node again. This will not remove any
+    permissions.
+    ''')),
+    ("allow-read", "<node-folder> <fingerprint> <item-mask>",
+    "allow read access for the specified node for the given item mask",
+    textwrap.dedent('''\
+    Allow the remote node with
+    the given fingerprint to access all data in the local node located at
+    <node-folder> with read-only permission.
+
+    When another node has read access to items matching a given item
+    mask, and this node has write access to that other node, the items
+    will automatically get synchronized if the nodes are connected
+    (see [b]link[/b]).''')),
+    ("disallow-read", "<node-folder> <item-mask> <fingerprint>",
+    "disallow read access for the specified node for the given item mask",
+    textwrap.dedent('''\
+    Revokes read
+    access to
+    the local node located at <node-folder> for the remote node with the
+    given fingerprint.''')),
+    ("allow-write", "<node-folder> <item-mask> <fingerprint>",
+    "allow write access for the specified node for the given item mask",
+    textwrap.dedent('''\
+    Allow the
+    remote node with
+    the given fingerprint to add data to the local node located at
+    <node-folder>. Please note this does NOT mean it can also access any
+    data - see "allow-read" to allow that.''')),
+    ("disallow-write", "<node-folder> <item-mask> <fingerprint>",
+    "disallow write access for the specified node for the given item mask",
+    textwrap.dedent('''\
+    Revokes write access to
+    the local node located at <node-folder> for the remote node with the
+    given fingerprint.''')),
+    ("enable-encrypt-password", "<node-folder> <item-mask> <password>",
+    "enable encryption for all items matching the item mask",
+    textwrap.dedent('''\
+    as soon as any data items arrive which are about to be saved to disk
+    which match the given item masks, encrypt it with the given password as
+    encryption secret.
+    Gateways will still be allowed to process the data once before it gets
+    encrypted and stored.
+
+    Please note the password should
+    be rather lengthy and random if you want to withstand brute-force
+    decryption of an attacker getting somehow access to your encrypted
+    information node storage contents on disk. The encryption is set up
+    to be asymmetric, so you'll never need to submit the password just to
+    start the node later or to add in more encrypted items - it will just
+    be required to decrypt items.
+    Search performance for such files might generally be considerably
+    slower (or for the information node in overall if it contains a large
+    amount of such encrypted files).
+    [b]SECURITY NOTICE:[/b] some
+    very basic metadata like time of creation and moficiation, the item's
+    tree path
+    (which is matched against the item mask), a random id and what the
+    item is (file, message, ...)
+    will still remain unencrypted for each data part to enable the
+    syncing protocol
+    to operate properly.
+    The actual filename or the message conversation targets or of course the
+    contents will be encrypted and hidden.
+    ''')),
+    ("disable-encrypt-password", "<node-folder> <item-mask> <password>",
+    "disable encryption for all items matching the item mask",
+    textwrap.dedent('''\
+    Disable the encryption with a password again. Please note decryption
+    all the items might take some time, so this command can take a while
+    to complete. If the information node is terminated before this command
+    completes, simply issue it again to make sure everything is decrypted.
+    ''')),
+    ("enable-encrypt-target-node", "<node-folder> <fingerprint> <cert>",
+    "enable encryption only decryptable by the specified target node's "+\
+        "cryptographic identity. " +\
+        "Read the detailed command help!",
+    textwrap.dedent('''\
+    As soon as any data arrives at this node from another node or from
+    an information gateway, encrypt it before it gets written to disk
+    in a way that allows decryption only with the private key
+    information possessed and stored
+    with the target node identified by <fingerprint> (which can run on any
+    other computer in this world - and doesn't need to be directly
+    linked).
+    Gateways will still be allowed to process the data once before it gets
+    encrypted and stored.
+    The node can and will still share the data with others according to
+    the specified read/write access and remote links, but no node
+    including
+    this node itself will be able to decrypt the contents.
+    Only if the specified target node ever obtains them, it will be
+    able to decrypt and actually read it.
+    The <cert> file needs to be obtained and provided manually from the
+    given target node (where it can be exported with [b]export-cert[/b])
+    for technical reasons - it will be verified to match
+    the fingerprint, so it should be safe to obtain it over insecure
+    ways if you need to. Publishing the <cert> file won't give an attacker
+    access to the data - however, publishing the file system contents of
+    the target node's local storage folder will.
+    [b]SECURITY NOTICE:[/b] some
+    very basic metadata like time of creation and a random id
+    will still remain unencrypted for each data part to enable the
+    syncing protocol
+    to operate properly.''')),
+    ("disable-encrypt-target-node", "<node-folder> <item-mask>",
+    "disable encryption of given items for the given target node",
+    textwrap.dedent('''\
+    Disables the target node encryption - but only for newly added
+    tems. This is because only the target node has the information to
+    decrypt anything again, so it is impossible for this node to do this.
+    Only if there is a sychronization from the target node for the
+    encryption to this
+    one, the files will be gradually synchronized back to an unencrypted
+    state at this node.''')),
+    ("enable-gateway", "<node-folder> <gateway-name> <gateway-options>",
+    "enable the given gateway which syncs data items in/out of the " +\
+        "node to e.g. a folder on disk you can access like dropbox, "+\
+        "your e-mail or similar",
+    textwrap.dedent('''\
+    Enable an automated gateway and provide the given set of
+    options which are
+    gateway specific. For the options, see [b]gateway-usage[/b].
+    For a list of all possible gateways, see [b]gateway-list[/b].
+    If you don't specify any options and the gateway had already been
+    running, it will relaunch with the last specified set of options.
+    [b]SECURITY NOTICE:[/b] the options will
+    be stored inside the <node-folder> location [b]including
+    passwords[/b] as plain text which some gateways require.
+    To wipe that info, see [b]remove-gateway[/b].''')),
+    ("gateway-list", "",
+    "list all available gateways",
+    textwrap.dedent('''\
+    A list of the names of all available gateways.
+    Use "gateway-info" below for details on a specific gateway.''')), 
+    ("gateway-usage", "<gateway-name>",
+    "show usage info for this gateway",
+    textwrap.dedent('''\
+    Print out what the gateway with this name does, how it works and
+    what options it takes for [b]enable-gateway[/b].''')),
+    ("gateway-status", "<node-folder> [gateway]",
+    "show info about a gateway's status on this node",
+    textwrap.dedent('''\
+    Show the status of all the running gateways at the given node (or
+    with more details for the specific one with the given gateway name,
+    if given).''')),
+    ("disable-gateway", "<node-folder> <gateway-name>",
+    "disable given gateway temporarily (keeps option data)",
+    textwrap.dedent('''\
+    Temporarily
+    disable a gateway - this will still keep the last used options stored.
+    To get rid of all traces of a gateway, use [b]forget-gateway[/b].''')),
+    ("forget-gateway", "<node-folder> <gateway-name>",
+    "disables given gateway completely including an option data wipe",
+    textwrap.dedent('''\
+    Disable the
+    given gateway if enabled, and then wipe all stored options data.''')),
+    ("export-cert", "<node-folder> <file-to-write-to>",
+    "export the certificate of this node which allows others "+\
+        "to encrypt specifically for this node",
+    textwrap.dedent('''\
+    Export the certificate file required for [b]encrypt-for-target[/b].
+    This file can be verified with the fingerprint and it doesn't allow
+    to decrypt anything, so it's rather safe to pass around.
+    It will allow another node to encrypt data that can only be encrypted
+    by this node - see [b]enable-encrypt-target-node[/b].''')),
+    ("export-identity", "<node-folder> <file-to-write-to> <passphrase>",
+    "export cryptographic identity - DANGEROUS. See detailed help",
+    textwrap.dedent('''\
+    [b]READ CAREFULLY![/b] This exports the
+    cryptographic data representing this node (beyond the fingerprint).
+    You should only ever require this to backup a node which needs to
+    decrypt files.
+    You will NEVER need this to let other nodes know how to encrypt things
+    for you, and it should never be anywhere else than a secure place and
+    this node's own machine.
+    You should only
+    store this identity data in some safe location!
+    (e.g. print it out, the file
+    is readable text and not that long!)
+    You are required to specify a password to encrypt it. It is recommended
+    you choose a very strong password if you ever store it in a possibly
+    unsafe location.
+    [b]SECURITY NOTICE:[/b] This data allows you to decrypt whatever only
+    this node could decrypt as per [b]encrypt-for-target[/b] and it allows
+    completely impersonating this node in all communication - therefore,
+    this data is [b]very sensitive[/b].''')),
+    ("import-identity", "<node-folder> <file-to-import> <passphrase>",
+    "re-import a cryptographic identity from a backup",
+    textwrap.dedent('''\
+    Import the exported identity into the node stored at the given
+    location (with the given decryption passphrase for the identity file).
+    This is useful if you want to back it up to ensure you will always be
+    able to decrypt data encrypted for this node only stored in other nodes,
+    even when this node's contents and identity are lost e.g. in a disk crash.
+
+    This import will wipe the node's previous identity, which means that its
+    fingerprint will change.
+    [b]POTENTIAL DATA LOSS NOTICE:[/b]
+    All data will be kept, but if the node was
+    previously the only one to be able to decrypt some specific data of
+    [b]encrypt-for-target[/b], it will now [b]no longer be able to do so
+    since that capability is linked with this cryptographic identity.[/b]'''
+    )),
+]
+
+# make a nice access dictionary of the action info:
+action_info = {}
+for action in action_info_list:
+    action_info[action[0]] = (action[0], action[1], action[2], action[3])
+
+def specify_action_text():
+    text = "Specify one of those possible actions to be executed:"
+    for action in action_info_list:
+        text += "\n\n[b]\"" + action[0] + "\" " + action[1] +\
+            "[/b] - " +\
+            action[2] + ("." if (not action[2].endswith(".") and \
+                not action[2].endswith("!") and \
+                not action[2].endswith("?")) else "") + \
+            "for " +\
+            "more details, try: ./information-node " + str(action[0]) +\
+            " --help"
+    return text
+
 parser.add_argument("action",
-    help=textwrap.dedent('''\
-        Specify the action to be executed:
-
-        [b]"node" <node-folder> [<[interface:]port>][/b] - create or
-        re-enable the
-        node at the given folder location, and optionally allow
-        remote access from other nodes (see "link" below) through the given
-        listen interface.
-
-        [b]"fingerprint" <node-folder>[/b] - show the fingerprint of the
-        node stored at the given folder. This represents the identity of this
-        particular node.
-
-        [b]"link" <target-host:target-port>[/b] - connect to a remote
-        node. Please note that unless "allow-read" or "allow-write" (see
-        below) was used to enable permissions in any direction, the nodes
-        will not be able to share or access any data from each other.
-
-        [b]"enable-read" <node-folder> <fingerprint>[/b] -
-        allow the remote node with
-        the given fingerprint to access all data in the local node located at
-        <node-folder> with read-only permission.
-
-        [b]"disallow-read" <node-folder> <fingerprint>[/b] - revokes read
-        access to
-        the local node located at <node-folder> for the remote node with the
-        given fingerprint.
-
-        [b]"allow-write" <node-folder> <fingerprint>[/b] - allow the
-        remote node with
-        the given fingerprint to add data to the local node located at
-        <node-folder>. Please note this does NOT mean it can also access any
-        data - see "allow-read" to allow that.
-
-        [b]"disallow-write" <node-folder> <fingerprint>[/b] - revokes
-        write access to
-        the local node located at <node-folder> for the remote node with the
-        given fingerprint.
-
-        [b]"enable-encrypt-password" <node-folder> <password>[/b] -
-        as soon as any data arrives which needs to be saved to disk, encrypt
-        it with the given password as a key.
-        Gateways will still be allowed to process the data once before it gets
-        encrypted and stored.
-        Please note the password should
-        be rather lengthy and random if you want to withstand brute-force
-        decryption of an attacker getting somehow access to your encrypted
-        information node storage contents on disk. The encryption is set up
-        to be asymmetric, so you'll never need to submit the password just to
-        start the node later or to add in more encrypted items - it will just
-        be required to decrypt items.
-        Search performance for such files might generally be considerably
-        slower (or for the information node in overall if it contains a large
-        amount of such encrypted files).
-        [b]SECURITY NOTICE:[/b] some
-        very basic metadata like time of creation and a random id
-        will still remain unencrypted for each data part to enable the
-        syncing protocol
-        to operate properly.
-
-        [b]"disable-encrypt-password" <node-folder> <password>[/b] -
-        disable the encryption with a password again. Please note decryption
-        all the items might take some time, so this command can take a while
-        to complete. If the information node is terminated before this command
-        completes, simply issue it again to make sure everything is decrypted.
-
-        [b]"enable-encrypt-target-node" <node-folder> <fingerprint> <cert>[/b]
-        -
-        as soon as any data arrives at this node from another node or from
-        an information gateway, encrypt it before it gets written to disk
-        in a way that allows decryption only with the private key
-        information possessed and stored
-        with the target node identified by <fingerprint> (which can run on any
-        other computer in this world - and doesn't need to be directly
-        linked).
-        Gateways will still be allowed to process the data once before it gets
-        encrypted and stored.
-        The node can and will still share the data with others according to
-        the specified read/write access and remote links, but no node
-        including
-        this node itself will be able to decrypt the contents.
-        Only if the specified target node ever obtains them, it will be
-        able to decrypt and actually read it.
-        The <cert> file needs to be obtained and provided manually from the
-        given target node (where it can be exported with [b]export-cert[/b])
-        for technical reasons - it will be verified to match
-        the fingerprint, so it should be safe to obtain it over insecure
-        ways if you need to. Publishing the <cert> file won't give an attacker
-        access to the data - however, publishing the file system contents of
-        the target node's local storage folder will.
-        [b]SECURITY NOTICE:[/b] some
-        very basic metadata like time of creation and a random id
-        will still remain unencrypted for each data part to enable the
-        syncing protocol
-        to operate properly.
-
-        [b]"disable-encrypt-target-node"[/b] <node-folder> -
-        disables the target node encryption - but only for newly added
-        items. This is because only the target node has the information to
-        decrypt anything again, so it is impossible for this node to do this.
-        Only if there is a sychronization from the target node for the
-        encryption to this
-        one, the files will be gradually synchronized back to an unencrypted
-        state at this node.
-
-        [b]"enable-gateway" <node-folder> <gateway-name> <options>[/b]
-        - enable an automated gateway and provide the given set of
-        options which are
-        gateway specific. For the options, see [b]gateway-usage[/b].
-        For a list of all possible gateways, see [b]gateway-list[/b].
-        If you don't specify any options and the gateway had already been
-        running, it will relaunch with the last specified set of options.
-        [b]SECURITY NOTICE:[/b] the options will
-        be stored inside the <node-folder> location [b]including
-        passwords[/b] as plain text which some gateways require.
-        To wipe that info, see [b]remove-gateway[/b].
-
-        [b]"gateway-list"[/b] - a list of the names of all available
-        gateways. Use "gateway-info" below for details on a specific gateway. 
-
-        [b]"gateway-usage" <gateway-name>[/b] -
-        print out what the gateway with this name does, how it works and
-        what options it takes for [b]enable-gateway[/b].
-
-        [b]"gateway-status" <node-folder> [gateway][/b] -
-        show the status of all the running gateways at the given node (or
-        with more details for the specific one with the given gateway name,
-        if given).
-
-        [b]"disable-gateway" <node-folder> <gateway-name>[/b] - temporarily
-        disable a gateway - this will still keep the last used options stored.
-        To get rid of all traces of a gateway, use [b]forget-gateway[/b].
-
-        [b]"forget-gateway" <node-folder> <gateway-name>[/b] - disable the
-        given gateway if enabled, and then wipe all stored options data.
-
-        [b]"export-cert" <node-folder> <file-to-write-to>[/b] -
-        export the certificate file required for [b]encrypt-for-target[/b].
-        This file can be verified with the fingerprint and it doesn't allow
-        to decrypt anything, so it's rather safe to pass around.
-
-        [b]"export-identity" <node-folder> <file-to-write-to>[/b] -
-        this exports the
-        cryptographic data representing this node (beyond the fingerprint).
-        You should only ever require this to backup a node that is the only
-        one to be able to decrypt important files, and you should only
-        store this data in some safe location. (e.g. print it out, the file
-        is readable text and not that long!)
-        [b]SECURITY NOTICE:[/b] This data allows you to decrypt whatever only
-        this node could decrypt as per [b]encrypt-for-target[/b] and it allows
-        completely impersonating this node in all communication - therefore,
-        this data is [b]very sensitive[/b].
-
-        [b]"import-identity" <node-folder> <file-to-import>[/b] -
-        import the exported identity into the node stored at the given
-        location. Its previous identity will be wiped, which means that its
-        fingerprint will change. All data will be kept, but if the node was
-        previously the only one to be able to decrypt a data as per
-        [b]encrypt-for-target[/b] it will now [b]no longer be able to do so
-        since that capability is linked with the cryptographic identity.[/b]
-    '''))
+    help=specify_action_text())
 parser.add_argument("argument", nargs="*",
     help="argument(s) to given action as specified above")
 if len(" ".join(sys.argv[1:]).strip()) == 0:
     parser.print_usage()
     sys.exit(1)
-args = parser.parse_args()
+
+# extract all arguments not meant for a subcommand:
+main_args = []
+subcmd_args = []
+for arg in sys.argv[1:]:
+    if not arg.startswith("-"):
+        main_args.append(arg)
+        subcmd_args = sys.argv[1 + len(main_args):]
+        break
+    main_args.append(arg)
+args = parser.parse_args(main_args)
 
 def check_if_node_dir(path, allow_new=False):
     if os.path.exists(path):
@@ -286,7 +419,8 @@ def check_if_node_dir(path, allow_new=False):
                 return False
         else:
             # check if a valid information node:
-            if not os.path.exists(os.path.join(path, "storage")):
+            if not os.path.exists(os.path.join(path, "storage")) or \
+                    not os.path.exists(os.path.join(path, "identity.secret")):
                 print("error: information-node: specified node folder is " +\
                     "not a valid information node", file=sys.stderr)
                 return False
@@ -324,17 +458,34 @@ def check_if_node_dir(path, allow_new=False):
             return False
         return True
 
+try:
+    from Crypto.PublicKey import RSA
+except ImportError:
+    print("error: information-node: PyCrypto is not available. "+\
+        "Please install it for Python 3 and try again.")
+    sys.exit(1)
+
 if args.action == "node":
-    args = args.argument
-    if len(args) < 1:
+    subparser = argparse.ArgumentParser(prog=\
+        os.path.basename(sys.argv[0]) + " node", description=\
+        action_info["node"][3],
+        formatter_class=DoubleLineBreakFormatter)
+    subparser.add_argument("node-folder",
+        help="argument(s) to given action as specified above")
+    subparser.add_argument("interface[:port]", nargs="?",
+        help="argument(s) to given action as specified above")
+    args = subparser.parse_args(subcmd_args)
+    args.interface = getattr(args, "interface[:port]") 
+
+    if len(args.argument) < 1:
         print("error: information-node: too few arguments for " +\
             "action: node", file=sys.stderr)
         sys.exit(1)
     
     # get interface info:
     interface_info = ""
-    if len(args) >= 2:
-        interface_info = args[1]
+    if len(args.argument) >= 2:
+        interface_info = args.argument[1]
 
     # see if interface info is valid:
     listen_ip = "::0"
@@ -403,6 +554,87 @@ if args.action == "node":
     # check if node dir is empty and we need to initialise it:
     if len(os.listdir(args[0])) == 0:
         print("Creating new information node at location " + args[0] + "...")
+
+        # create item storage directory:
+        os.mkdir(os.path.join(args[0], "storage"))
+
+        # create and store a new identity:
+        identity = Identity()
+        identity.save_to_file(os.path.join(args[0], "identity.secret"))
+
+        # create log directory:
+        os.mkdir(os.path.join(args[0], "logs"))
+
+    # check if pid file exists:
+    if os.path.exists(os.path.join(args[0], "pidfile")):
+        # open it up to check for the running process:
+        f = os.path.join(args[0], "pidfile")
+        contents = f.read()
+        f.close()
+        # check if valid pid:
+        try:
+            pidnumber = int(contents)
+        except ValueError:
+            pidnumber = None
+        if pidnumber == None or pidnumber < 1:
+            print("error: information-node: pidfile has invalid contents. "+\
+                "Check if this node has already a process running, and if "+\
+                "you are sure this is not the case, remove the pidfile.",\
+                file=sys.stderr)
+            sys.exit(1)
+
+        # check if a process with this pid is running:
+        def check_process_running(self, pid):
+            if platform.system() == "windows":
+                PROCESS_QUERY_INFROMATION = 0x1000
+                processHandle = ctypes.windll.kernel32.OpenProcess(
+                    PROCESS_QUERY_INFROMATION, 0, pid)
+                if processHandle == 0:
+                    return False
+                else:
+                    ctypes.windll.kernel32.CloseHandle(processHandle)
+                return True 
+            else:
+                try:
+                    os.kill(pid, 0)
+                except OSError:
+                    return False
+                else:
+                    return True
+        if check_process_running(pidnumber):
+            print("info: information-node: this information node is " +\
+                "already running with process id " + str(pidnumber) +\
+                ". nothing to do.", file=sys.stderr)
+            sys.exit(0)
         
+        print("warning: information-node: removing stale " +\
+            "pidfile with pid: " + str(pidnumber))
+        os.remove(os.path.join(args[0], "pidfile"))
+    
+    print("Launching information-node daemon...")
+    if platform.system() == "windows":
+        # on windows we cannot fork, so we need to run ourselves again as
+        # a new detached process (unless we _are_ that detached process):
+        if not args.foreground:
+            DETACHED_PROCESS = 8
+            subprocess.Popen([sys.executable, __file__, 
+                "node", "--foreground", args[0]],
+                creationflags=DETACHED_PROCESS,
+                close_fds=True)
+else:
+    if args.action in action_info:
+        print("Dear user,")
+        print("")
+        print("This software is still \033[1mwork in progress\033[21m.\n"+\
+            "Sadly, this action is \033[1mnot available yet\033[21m" +\
+            " in this version.")
+        print("")
+        print("Best regards,\nThe developers")
+        print("")
+        print("error: information-node: action UNIMPLEMENTED: " + args.action,
+            file=sys.stderr)
+        sys.exit(1)
+    print("error: information-node: unknown action: " + args.action,
+        file=sys.stderr)
 
 

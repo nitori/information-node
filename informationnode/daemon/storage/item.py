@@ -14,7 +14,7 @@ class TargetNodeEncryption(object):
         self.target_node_pubkey = target_node_pubkey
         self.privkey = None
 
-    def set_decryption_key(self, target_node_privkey):
+    def set_decryption_private_key(self, target_node_privkey):
         self.privkey = target_node_privkey
 
     def encrypt(self, data):
@@ -25,19 +25,24 @@ class TargetNodeEncryption(object):
         pass
 
 class Item(object):
-    CHUNK_SIZE=(1024 * 1000)
-    def __init__(self, suggested_identifier):
+    def __init__(self, suggested_identifier, content_version=1):
         self.mime_type = "text/plain"
         self.classification = "file"
         self.encryption = None
         self.identifier = None
+        self.content_version_id = content_version
+        self.contents_finalized = True
         self.creation_time = datetime.datetime.now()
-        self.raw_chunk_data = None
-        if suggested_identifier != None:
+        self.modification_time = datetime.datetime.now()
+        self.raw_data = None
+        if suggested_identifier != None:  # this is a new item:
             # this should be pretty free of collisions, given the
             # suggested identifier:
             item.identifier = uuid.uuid4() + "-" +\
                 hashlib.sha224(suggested_identifier).hexdigest()
+
+            # new item that isn't finalized:
+            self.contents_finalized = False
         return item
 
     def save(self):
@@ -65,9 +70,40 @@ class Item(object):
     def content_get(self, chunk_no):
         return None
 
-    def content_set(self, chunk_no, value):
+    def content_set_chunk(self, chunk_no, value):
+        # only allow write access if content hasn't been finalized:
+        if self.contents_finalized:
+            raise RuntimeError('item has been finalized. open a new one '+\
+                'with a newer content version instead.')
+        # deal with encryption
         if self.encryption != None:
             #
             pass
         self.raw_chunk_data[chunk_no] = value
+
+    def crop_chunks(self, chunk_amount):
+        # only allow write access if content hasn't been finalized:
+        if self.contents_finalized:
+            raise RuntimeError('item has been finalized. open a new one '+\
+                'with a newer content version instead.')
+        
+
+    def content_set_from_file(self, file_path):
+        # only allow write access if content hasn't been finalized:
+        if self.contents_finalized:
+            raise RuntimeError('item has been finalized. open a new one '+\
+                'with a newer content version instead.')
+
+    def content_set_from_bytes(self, bytes):
+        # only allow write access if content hasn't been finalized:
+        if self.contents_finalized:
+            raise RuntimeError('item has been finalized. open a new one '+\
+                'with a newer content version instead.') 
+
+class QueryItems(object):
+    def get_by_id(self, identifier):
+        """ Get all versions of the item with this identifier. """
+        items = []
+        
+
 
