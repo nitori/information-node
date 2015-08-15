@@ -1,5 +1,23 @@
 #!/usr/bin/env python3
 
+'''
+information-node - an advanced tool for data synchronization
+Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+
 import argparse
 import ctypes
 import os
@@ -334,11 +352,16 @@ faq_text = textwrap.dedent('''\
     to specified read/write access rules. This creates
     an autonomous data sharing cloud, similar to e.g.
     syncthing or Dropbox.
-    The data in such a node usually cannot be accessed directly,
-    it is hidden in a black box data structure optimized for fast access
-    and possibly encrypted - therefore, think of it
-    as something similar to git's bare repository if you want.
-    However, it can be accessed using various different ways, see below.
+
+    [b]== Why should I use this? ==[/b]
+
+    - You want something like Dropbox or Syncthing but also for your messages
+      and e-mails and not just files
+
+    - You don't like using proprietary non-free tools
+
+    - You want automatic remote backup locations which can be secured with
+      strong encryption
 
     [b]== What sort of data does an information node store? ==[/b]
 
@@ -349,46 +372,32 @@ faq_text = textwrap.dedent('''\
     to files only but includes abstract objects that can also
     model messages/e-mails/.. and tools to manage them.
 
-    [b]== Why not just use plain files? ==[/b]
-
-    Information nodes allow non-file contents like e-mails, chat
-    messages to be stored. It can also sync all stored files, e-mails,
-    ... to other nodes and encrypt them, giving you a true distributed
-    cloud setup with one simple command line tool.
-
     [b]== Where is the data of a node stored? ==[/b]
 
     It is all stored in the given node folder (see commands below).
-    Nothing is stored outside except some basic preferences for
-    the graphical node contents viewer if you use that one.
+    The storage is a sort of black box optimized for performance, so
+    you cannot trivially browse the files similar to Dropbox or syncthing.
+    If you want to look at it you'll either need to use the inode-viewer
+    or set up a file gateway to a regular folder (which mimics a Dropbox
+    setup).
+
+    Nothing is stored outside the node folder except some basic preferences
+    for the graphical node contents viewer if you use that one.
     The data is only shared exactly in the fashion specified by
-    you, and if you want also encrypted.
+    you, and if you want also encrypted inside the node's internal storage.
 
-    [b]== How do I access and look at the data, or add new data? ==[/b]
+    [b]== How do I get my e-mails into this thing easily? ==[/b]
 
-    If you just want to browse the data and possibly do minor
-    modifications, use the information node client (separate binary)
-    to access and review
-     the data in a specific node and manually edit it (like you would
-     read e-mails in an e-mail client).
     To use an information node as automated communication relay with
     regular protocols (e-mail, IM), look at [b]enable-gateway[/b] below
     which allows an information node to be used as an [b]e-mail client[/b],
-    [b]XMPP chat client[/b] and much more.
+    [b]XMPP chat client[/b] and much more. (the inode-viewer can assist you
+    with this as well.)
     Remember, you can always sync everything with other nodes too, and
     look and interact with it using the viewer.
     A file gateway also allows you to map your files to a regular
     folder on your disk to have your own private dropbox/syncthing/btsync
     equivalent.
-
-    [b]== Why should I use this? ==[/b]
-
-    If you would like something like Dropbox or Syncthing for your
-    e-mail or Instant Messaging messages too, this tool is for you.
-    If you want to have something like Syncthing but with remote nodes
-    that only provide backup locations and are fully encrypted without
-    the secure decryption key ever being on the remote location, this is
-    for you as well.
 
     [b]== Is this system secure against data thieves? ==[/b]
 
@@ -402,7 +411,8 @@ faq_text = textwrap.dedent('''\
     node which can decrypt it with its cryptographic identity), in which
     case it'll be trivial to open up. It is therefore as safe as the
     respective target node is kept.
-    Also, always remember, [b]one rogue node[/b] with write access can
+
+    But always remember, [b]one rogue node[/b] with write access can
     do a lot of damage. (even with read access when it steals your data)
     In the end, this software can also always have bugs. The code is
     open-source, if you have the knowledge please help review and secure
@@ -419,7 +429,8 @@ faq_text = textwrap.dedent('''\
     being able to decrypt some of your data as per
     [b]encrypt-for-target[/b], use [b]export-identity[/b] (see below)
     to backup its private key.
-    Also don't forget, this software can have bugs which might also cause
+
+    But don't forget, this software can have bugs which might also cause
     data loss of any sort.
 
     [b]== How do I get started? ==[/b]
