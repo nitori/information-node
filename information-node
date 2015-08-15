@@ -15,7 +15,8 @@ class DoubleLineBreakFormatter(argparse.HelpFormatter):
     def _split_lines(self, text, width):
         return self._fill_text(text, width, "").splitlines(False)
 
-    def _fill_text(self, t, width, indent):
+    @staticmethod
+    def _static_fill_text(t, width, indent):
         t = " ".join([s for s in t.replace("\t", " ").strip("\t ").split(" ")\
             if len(s) > 0]).replace("\n ", "\n").replace(" \n", " ")
         ts = re.sub("([^\n])\n([^\n])", "\\1 \\2", t).split("\n\n")
@@ -25,100 +26,13 @@ class DoubleLineBreakFormatter(argparse.HelpFormatter):
         return "\n\n".join(result).replace("[b]",
         "\033[1m").replace("[/b]", "\033[21m")
 
+    def _fill_text(self, t, width, indent):
+        return self._static_fill_text(t, width, indent)
+
 parser = argparse.ArgumentParser(description=\
-    "Tool to create and manage information nodes, licensed as "+\
-    "GPLv3+.\n\n\n\n" +\
-\
-    "[b]== What is an information node? ==[/b]\n\n"+\
-    "Information nodes simply store "+\
-    "data and share it amongst themselves when linked with each other "+\
-    "according "+\
-    "read/write access over encrypted connections ("+\
-    "creating an autonomous data sharing cloud, similar to e.g. "+\
-    "syncthing). This data usually cannot be accessed directly, " +\
-    "it is hidden in a binary blob optimized for fast access "+\
-    "and possibly encrypted - therefore, think of it"+\
-    " as something similar to git's bare repository if you want.\n\n"+\
-\
-    "[b]== What sort of data does an information node store? ==[/b]\n\n"\
-    "A: Nodes are meant to store any sort of data you might have, like "+\
-    "e-mail, Instant Messaging, personal file cloud etc. Unlike "+\
-    "other synchronisation tools like rsync, dropbox, syncthing, " +\
-    "seafile, .. it is NOT specifically limited "+\
-    "to files only but includes abstract objects that can also "+\
-    "model messages/e-mails/.. and tools to manage them.\n\n"+\
-\
-    "[b]== Why not just use plain files? ==[/b]\n\n" +\
-    "Information nodes allow non-file contents like e-mails, chat "+\
-    "messages to be stored. It can also sync all stored files, e-mails, "+\
-    "... to other nodes and encrypt them, giving you a true distributed " +\
-    "cloud setup with one simple command line tool.\n\n"+\
-\
-    "[b]== Where is the data of a node stored? ==[/b]\n\n" +\
-    "It is all stored in the given node folder (see commands below)." +\
-    " Nothing is stored outside except some basic preferences for " +\
-    "the graphical node contents viewer if you use that one. " +\
-    "The data is only shared exactly in the fashion specified by "+\
-    "you, and if you want also encrypted.\n\n"+\
-\
-    "[b]== How do I access and look at the data, or add "+\
-    "new data? ==[/b]\n\n"+\
-    "If you just want to browse the data and possibly do minor "+\
-    "modifications, use the information node client (separate binary) "+\
-    "to access and review"+\
-    " the data in a specific node and manually edit it (like you would" +\
-    " read e-mails in an e-mail client). "+\
-    "To use an information node as automated communication relay with "+\
-    "regular protocols (e-mail, IM), look at [b]enable-gateway[/b] below "+\
-    "which allows an information node to be used as an [b]e-mail client[/b]"+\
-    ", [b]XMPP chat client[/b] and much more."+\
-    " Remember, you can always sync everything with other nodes too, and "+\
-    "look and interact with it using the viewer."+\
-    " A file gateway also allows you to map your files to a regular "+\
-    "folder on your disk to have your own private dropbox/syncthing/btsync "+\
-    "equivalent.\n\n"+\
-\
-    "[b]== Why should I use this? ==[/b]\n\n" +\
-    "If you would like something like Dropbox or Syncthing for your "+\
-    "e-mail or Instant Messaging messages too, this tool is for you. "+\
-    "If you want to have something like Syncthing but with remote nodes "+\
-    "that only provide backup locations and are fully encrypted without "+\
-    "the secure decryption key ever being on the remote location, this is"+\
-    " for you as well.\n\n" +\
-\
-    "[b]== Is this system secure? ==[/b]\n\n"+\
-    "This depends. [b]encrypt-password[/b] data will be as secure as your "+\
-    "chosen password is, when subject to a brute force attack. " +\
-    "(and trojans could sniff the password when you enter it in the viewer "+\
-    "to look at the data yourself, so make sure your machine is clean) " +\
-    "[b]encrypt-for-node[/b] data will be hardened with RSA/AES and will "+\
-    "be rather hard to steal and decrypt - unless an attacker gets their "+\
-    "hands on the node directory contents of the [b]target node[/b] (the "+\
-    "node which can decrypt it with its cryptographic identity), in which "+\
-    "case it'll be trivial to open up. It is therefore as safe as the " +\
-    "respective target node is kept."+\
-    "Also, always remember, [b]one rogue node[/b] with write access can "+\
-    "do a lot of damage. (even with read access when it steals your data) "+\
-    "In the end, this software can also always have bugs. The code is "+\
-    "open-source, if you have the knowledge please help review and secure "+\
-    "it."+\
-    "[b]What happens in case of data loss (dead hard disk etc.)?[/b] "+\
-    "There is versioning support (configurable through the client) which "+\
-    "should help a bit against file corruption if you notice it "+\
-    "early enough. "+\
-    "If a node suffers sudden catastrophic failure, you should be fine if "+\
-    "you had the data distributed to at least one other node."+\
-    "If you fear you will lose the only node "+\
-    "being able to decrypt some of your data as per "+\
-    "[b]encrypt-for-target[/b], use [b]export-identity[/b] (see below) " +\
-    "to backup its private key.\n\n"+\
-\
-    "[b]== How do I get started? ==[/b]\n\n"+\
-    "Create a node (see the action [b]\"node\"[/b] below), then "+\
-    "get connected to it with [b]information-node-viewer[/b]. "+\
-    "The viewer will also assist you setting up "+\
-    "gateways to interface with IMAP, a folder like dropbox, .. "+\
-    "Later on, add and link remote nodes as you see fit.",
+    "Tool to create and manage information nodes. "+\
+    "This tool is free software. "+\
+    "See LICENSE.txt for license and copying information.",
     formatter_class=DoubleLineBreakFormatter)
 action_info_list = [
     ("node", "<node-folder> [<[interface:]port>]",
@@ -370,7 +284,7 @@ action_info = {}
 for action in action_info_list:
     action_info[action[0]] = (action[0], action[1], action[2], action[3])
 
-def specify_action_text():
+def get_action_overall_help_text():
     text = "Specify one of those possible actions to be executed:"
     for action in action_info_list:
         text += "\n\n[b]\"" + action[0] + "\" " + action[1] +\
@@ -378,18 +292,165 @@ def specify_action_text():
             action[2] + ("." if (not action[2].endswith(".") and \
                 not action[2].endswith("!") and \
                 not action[2].endswith("?")) else "") + \
-            "for " +\
+            " For " +\
             "more details, try: ./information-node " + str(action[0]) +\
             " --help"
     return text
 
+faq_text = textwrap.dedent('''\
+    Information nodes are managed with those tools:
+
+    * [b]inode-viewer[/b]: this is the graphical application which assists
+        in creating, managing and browsing a node. Use this if you don't
+        want to learn the detailed tools.
+
+    * [b]information-node[/b]: the management tool for creating and managing
+        nodes. It doesn't concern itself with the actual concrete data
+        contents of a node, use either the graphical viewer or
+        inode-viewer-cli for that.
+
+    * [b]inode-viewer-cli[/b]: simple command line tool to directly list and
+        extract or modify the actual data items contained in a node. Only
+        for advanced usage or scripts, you would normally want to use either
+        the graphical viewer or a gateway.
+
+    Everything the graphical viewer does can be done using either
+    information-node or inode-viewer-cli as well.
+
+    [b]== What is an information node? ==[/b]
+
+    Information nodes simply store
+    data and share it amongst themselves when linked with each other
+    according
+    read/write access over encrypted connections
+    (creating an autonomous data sharing cloud, similar to e.g.
+    syncthing). This data usually cannot be accessed directly,
+    it is hidden in a black box data structure optimized for fast access
+    and possibly encrypted - therefore, think of it
+    as something similar to git's bare repository if you want.
+
+    [b]== What sort of data does an information node store? ==[/b]
+
+    Nodes are meant to store any sort of data you might have, like
+    e-mail, Instant Messaging, personal file cloud etc. Unlike
+    other synchronisation tools like rsync, dropbox, syncthing,
+    seafile, .. it is NOT specifically limited
+    to files only but includes abstract objects that can also
+    model messages/e-mails/.. and tools to manage them.
+
+    [b]== Why not just use plain files? ==[/b]
+
+    Information nodes allow non-file contents like e-mails, chat
+    messages to be stored. It can also sync all stored files, e-mails,
+    ... to other nodes and encrypt them, giving you a true distributed
+    cloud setup with one simple command line tool.
+
+    [b]== Where is the data of a node stored? ==[/b]
+
+    It is all stored in the given node folder (see commands below).
+    Nothing is stored outside except some basic preferences for
+    the graphical node contents viewer if you use that one.
+    The data is only shared exactly in the fashion specified by
+    you, and if you want also encrypted.
+
+    [b]== How do I access and look at the data, or add new data? ==[/b]
+
+    If you just want to browse the data and possibly do minor
+    modifications, use the information node client (separate binary)
+    to access and review
+     the data in a specific node and manually edit it (like you would
+     read e-mails in an e-mail client).
+    To use an information node as automated communication relay with
+    regular protocols (e-mail, IM), look at [b]enable-gateway[/b] below
+    which allows an information node to be used as an [b]e-mail client[/b],
+    [b]XMPP chat client[/b] and much more.
+    Remember, you can always sync everything with other nodes too, and
+    look and interact with it using the viewer.
+    A file gateway also allows you to map your files to a regular
+    folder on your disk to have your own private dropbox/syncthing/btsync
+    equivalent.
+
+    [b]== Why should I use this? ==[/b]
+
+    If you would like something like Dropbox or Syncthing for your
+    e-mail or Instant Messaging messages too, this tool is for you.
+    If you want to have something like Syncthing but with remote nodes
+    that only provide backup locations and are fully encrypted without
+    the secure decryption key ever being on the remote location, this is
+    for you as well.
+
+    [b]== Is this system secure against data thieves? ==[/b]
+
+    This depends. [b]encrypt-password[/b] data will be as secure as your
+    chosen password is, when subject to a brute force attack.
+    (and trojans could sniff the password when you enter it in the viewer
+    to look at the data yourself, so make sure your machine is clean)
+    [b]encrypt-for-node[/b] data will be hardened with RSA/AES and will
+    be rather hard to steal and decrypt - unless an attacker gets their
+    hands on the node directory contents of the [b]target node[/b] (the
+    node which can decrypt it with its cryptographic identity), in which
+    case it'll be trivial to open up. It is therefore as safe as the
+    respective target node is kept.
+    Also, always remember, [b]one rogue node[/b] with write access can
+    do a lot of damage. (even with read access when it steals your data)
+    In the end, this software can also always have bugs. The code is
+    open-source, if you have the knowledge please help review and secure
+    it.
+
+    [b]== What happens in case of data loss (dead hard disk etc.)? ==[/b]
+
+    There is versioning support (configurable through the client) which
+    should help a bit against file corruption if you notice it
+    early enough.
+    If a node suffers sudden catastrophic failure, you should be fine if
+    you had the data distributed to at least one other node.
+    If you fear you will lose the only node
+    being able to decrypt some of your data as per
+    [b]encrypt-for-target[/b], use [b]export-identity[/b] (see below)
+    to backup its private key.
+    Also don't forget, this software can have bugs which might also cause
+    data loss of any sort.
+
+    [b]== How do I get started? ==[/b]
+
+    Create a node (see the action [b]"node"[/b] below), then
+    get connected to it with [b]information-node-viewer[/b].
+    The viewer will also assist you setting up
+    gateways to interface with IMAP, a folder like dropbox, ..
+    Later on, add and link remote nodes as you see fit.
+    ''') 
+
+def print_faq():
+    print("This is a comprehensive FAQ on information nodes:")
+    print("")
+    t = DoubleLineBreakFormatter._static_fill_text(faq_text, 78, "   ")
+    print(t)
+    print("")
+    print("ALWAYS REMEMBER, nothing is perfectly safe. USE AT YOUR OWN RISK.")
+    print("If you have more questions, don't hesitate to seek " +\
+        "contact at:\n  https://github.com/JonasT/information-node")
+ 
 parser.add_argument("action",
-    help=specify_action_text())
+    help=get_action_overall_help_text())
+parser.add_argument("--faq",
+    default=False, action="store_true",
+    help="display a basic FAQ explaining how this tool is useful, " +\
+        "what you should use it for and what not")
 parser.add_argument("argument", nargs="*",
     help="argument(s) to given action as specified above")
+
+# display usage if there are literally no arguments at all:
 if len(" ".join(sys.argv[1:]).strip()) == 0:
     parser.print_usage()
     sys.exit(1)
+
+# show faq if --faq is used:
+for arg in sys.argv[1:]:
+    if arg == "--":
+        break
+    if arg == "--faq":
+        print_faq()
+        sys.exit(0)
 
 # extract all arguments not meant for a subcommand:
 main_args = []
@@ -401,6 +462,9 @@ for arg in sys.argv[1:]:
         break
     main_args.append(arg)
 args = parser.parse_args(main_args)
+if args.faq:
+    print_faq()
+    sys.exit(0)
 
 def check_if_node_dir(path, allow_new=False):
     if os.path.exists(path):
@@ -471,9 +535,14 @@ if args.action == "node":
         action_info["node"][3],
         formatter_class=DoubleLineBreakFormatter)
     subparser.add_argument("node-folder",
-        help="argument(s) to given action as specified above")
+        help="the location where the node is stored or should be created at")
     subparser.add_argument("interface[:port]", nargs="?",
-        help="argument(s) to given action as specified above")
+        help="interface to listen at for remote connections "+\
+            "for links (optional)")
+    subparser.add_argument("foreground", default=False,
+        action='store_true',
+        help="don't daemonize the data server and run it in another "+\
+            "thread/process. Instead, run it in this terminal in foreground")
     args = subparser.parse_args(subcmd_args)
     args.interface = getattr(args, "interface[:port]") 
 
