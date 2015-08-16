@@ -5,24 +5,18 @@ This project offers a new concept of **information nodes** for keeping your
 data synchronized between various locations (cloud storage if you will) and
 keeping data safe with the help of encryption.
 
+The project supports POSIX-systems (Linux, BSD, Mac OS X, ..) and Microsoft
+Windows.
+
 
 # Features
 
-It supports POSIX-systems (Linux, BSD, Mac OS X, ..) and Microsoft Windows.
+- synchronizes files and e-mails, instant messages, .. for supported services
+  between any number of secure locations
 
-The main differences to Dropbox or syncthing are:
+- full data encryption for remote backup locations supported
 
-* no central server, instead peer-to-peer (similar to syncthing)
-
-* support for non-file data like e-mails, IM, ... including gateways that
-  automatically fetch your e-mails, messages, etc into a node and sync it into
-  your network.
-
-* graphical viewer that browses and searches all the data easily
-
-* built-in support for encryption, including storing data on a remote location
-  just as fully asynchronously encrypted blob that can only be decrypted at
-  your main site
+- graphical viewer for browsing a node's contents and working with it
 
 Please note due to the advanced featureset (non-file support for e-mails, ..
 and encryption), this tool is slightly more work to learn and use than
