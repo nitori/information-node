@@ -60,9 +60,10 @@ inode-viewer
 
 ## Why?
 
-The main idea of information nodes is to allow you to move ALL your data,
+The main idea of information nodes is to allow you to move *all* your data,
 not just your files, including all your communication activity, into
-possibly encrypted nodes.
+possibly encrypted nodes, so as few data as possible is unencrypted and
+exposed.
 
 In days where all sorts of attackers and agencies want to spy onto your
 data, this should help you set up a trusted storage network with decryption
@@ -77,4 +78,5 @@ an information node network:
 
 * regular files (similar to Dropbox/syncthing)
 
+Please help us expand this list! Volunteer work wanted!
 
