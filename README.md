@@ -1,5 +1,6 @@
 
-== Information nodes ==
+# Information node
+
 This project offers a new concept of **information nodes** for keeping your
 data synchronized between various locations (cloud storage if you will) and
 safe with encryption.
@@ -29,20 +30,22 @@ commands allowing a very hands on approach in managing your nodes and making
 sure everything is synchronized the way you want. You can also use the
 graphical viewer to assist you with managing your nodes.
 
-=== Why? ===
-The philosophy of information nodes is to allow you to move ALL your data,
-not just your files, including all your communication activity, into
-possibly encrypted nodes. In days where all sorts of attackers and
-agencies want to spy onto your data, this should help you set up a trusted
-storage network with decryption only possible from your local trusted laptop
-or with a secured key file you have on your local usb stick and not in the
-cloud.
+## Why?
 
-== How to get started / INSTALL ==
+The main idea of information nodes is to allow you to move ALL your data,
+not just your files, including all your communication activity, into
+possibly encrypted nodes.
+
+In days where all sorts of attackers and agencies want to spy onto your
+data, this should help you set up a trusted storage network with decryption
+only possible from your local trusted laptop or with a secured key file you
+have on your local usb stick and not in the cloud.
+
+# How to get started / INSTALL
 
 ** WARNING THIS PROJECT IS HIGHLY UNFINISHED. DONT USE **
 
-=== Windows ===
+## Windows
 
 1. Install latest Python 3 release for windows: https://www.python.org/downloads/windows/
 
@@ -50,7 +53,7 @@ cloud.
 
 3. Run viewer.bat and enter the python installation path when it asks you
 
-=== Linux / BSD / Mac OS X ... ===
+## Linux / BSD / Mac OS X ...
 
 Download this project with git or as .zip and extract it in some folder.
 Then, the easiest way of install is:
@@ -67,7 +70,8 @@ Enter the following to open up the graphical viewer:
 inode-viewer
 ```
 
-== What exact data types and protocols are supported? ==
+# What exact data types and protocols are supported?
+
 At this moment, the following data types and protocols can be handled by
 an information node network:
 

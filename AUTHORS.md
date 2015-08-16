@@ -1,6 +1,7 @@
-== information-node Development Team ==
+
+# information-node Development Team
 
 Those are the authors/contributors to this project:
 
-Jonas Thiem
+- Jonas Thiem
 
