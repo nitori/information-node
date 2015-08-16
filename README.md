@@ -5,6 +5,9 @@ This project offers a new concept of **information nodes** for keeping your
 data synchronized between various locations (cloud storage if you will) and
 keeping data safe with the help of encryption.
 
+
+# Features
+
 It supports POSIX-systems (Linux, BSD, Mac OS X, ..) and Microsoft Windows.
 
 The main differences to Dropbox or syncthing are:
@@ -30,20 +33,10 @@ commands allowing a very hands on approach in managing your nodes and making
 sure everything is synchronized the way you want. You can also use the
 graphical viewer to assist you with managing your nodes.
 
-## Why?
 
-The main idea of information nodes is to allow you to move ALL your data,
-not just your files, including all your communication activity, into
-possibly encrypted nodes.
+# How to get started / Installation
 
-In days where all sorts of attackers and agencies want to spy onto your
-data, this should help you set up a trusted storage network with decryption
-only possible from your local trusted laptop or with a secured key file you
-have on your local usb stick and not in the cloud.
-
-# How to get started / INSTALL
-
-** WARNING THIS PROJECT IS HIGHLY UNFINISHED. DONT USE **
+**WARNING THIS PROJECT IS HIGHLY UNFINISHED. DONT USE**
 
 ## Windows
 
@@ -69,6 +62,19 @@ Enter the following to open up the graphical viewer:
 ```bash
 inode-viewer
 ```
+
+
+## Why?
+
+The main idea of information nodes is to allow you to move ALL your data,
+not just your files, including all your communication activity, into
+possibly encrypted nodes.
+
+In days where all sorts of attackers and agencies want to spy onto your
+data, this should help you set up a trusted storage network with decryption
+only possible from your local trusted laptop or with a secured key file you
+have on your local usb stick and not in the cloud.
+
 
 # What exact data types and protocols are supported?
 
