@@ -18,5 +18,121 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+import argparse
+from informationnode.helper import check_if_node_dir, check_if_node_runs
+from informationnode.helper import DoubleLineBreakFormatter
+import os
+import platform
+import sys
+import textwrap
+
+parser = argparse.ArgumentParser(description=\
+    "Command line tool to manage existing information nodes. "+\
+    "This tool is free software. "+\
+    "See LICENSE.txt for license and warranty information.",
+    formatter_class=DoubleLineBreakFormatter)
+
+action_info_list = [
+    ("raw-cmd", "<node-folder>",
+    "send the raw JSON-formatted command from stdin to the node " +\
+        "and print the response",
+    textwrap.dedent('''\
+    Send the given raw command in JSON format to the given node's data server.
+    Afterwards, print the node's response (also JSON) on stdout.
+    
+    This can be useful if you want to access the node api through an
+    automated script.
+    ''')),
+]
+
+# make a nice access dictionary of the action info:
+action_info = {}
+for action in action_info_list:
+    action_info[action[0]] = (action[0], action[1], action[2], action[3])
+
+def get_action_overall_help_text():
+    text = "Specify one of those possible actions to be executed:"
+    for action in action_info_list:
+        text += "\n\n[b]\"" + action[0] + "\" " + action[1] +\
+            "[/b] - " +\
+            action[2] + ("." if (not action[2].endswith(".") and \
+                not action[2].endswith("!") and \
+                not action[2].endswith("?")) else "") + \
+            " For " +\
+            "more details, try: ./inode-viewer-cli " + str(action[0]) +\
+            " --help"
+    return text
+
+parser.add_argument("action",
+    help=get_action_overall_help_text())
+parser.add_argument("--json", default=False,
+    action="store_true",
+    help="return the output formatted as JSON instead of plain " +\
+        "human readable text as most commands do per default")
+parser.add_argument("argument", nargs="*",
+    help="argument(s) to given action as specified above")
+
+# display usage if there are literally no arguments at all:
+if len(" ".join(sys.argv[1:]).strip()) == 0:
+    parser.print_usage()
+    sys.exit(1)
+
+# extract all arguments not meant for a subcommand:
+main_args = []
+subcmd_args = []
+for arg in sys.argv[1:]:
+    if not arg.startswith("-"):
+        main_args.append(arg)
+        subcmd_args = sys.argv[1 + len(main_args):]
+        break
+    main_args.append(arg)
+args = parser.parse_args(main_args)
+
+if args.action == "raw-cmd":
+    subparser = argparse.ArgumentParser(prog=\
+        os.path.basename(sys.argv[0]) + " raw-cmd", description=\
+        action_info["raw-cmd"][3],
+        formatter_class=DoubleLineBreakFormatter)
+    subparser.add_argument("node-folder",
+        help="the node to which this command should be sent")
+    args = subparser.parse_args(subcmd_args)
+    setattr(args, "node_folder", getattr(args, "node-folder"))
+
+    # check if this is a valid node:
+    result = check_if_node_dir(args.node_folder)
+    if result != True:
+        print("inode-viewer-cli: error: " + result + ": " +\
+            args.node_folder) 
+        sys.exit(1)
+
+    # check if node runs:
+    (result, msg) = check_if_node_runs(node_folder)
+    if result == None:
+        print("inode-viewer-cli: error: " + msg, file=sys.stderr)
+        sys.exit(1)
+    if not result:
+        print("inode-viewer-cli: error: the data server of this "+\
+            "node isn't running.", file=sys.stderr)
+        sys.exit(1)
+
+    # open up the unix file socket (linux) or the according port (windows):
+    if platform.system().lower() == "windows":
+
+    else:     
+else:
+    if args.action in action_info:
+        print("Dear user,")
+        print("")
+        print("This software is still \033[1mwork in progress\033[21m.\n"+\
+            "Sadly, this action is \033[1mnot available yet\033[21m" +\
+            " in this version.")
+        print("")
+        print("Best regards,\nThe developers")
+        print("")
+        print("inode-viewer-cli: error: action UNIMPLEMENTED: " + args.action,
+            file=sys.stderr)
+        sys.exit(1)
+    print("inode-viewer-cli: error: unknown action: " + args.action,
+        file=sys.stderr)
 
 

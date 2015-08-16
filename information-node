@@ -30,30 +30,13 @@ import time
 
 from informationnode.daemon.daemon import Daemon
 from informationnode.daemon.identity import Identity
-
-class DoubleLineBreakFormatter(argparse.HelpFormatter):
-    """ Retains double line breaks/paragraphs """
-    def _split_lines(self, text, width):
-        return self._fill_text(text, width, "").splitlines(False)
-
-    @staticmethod
-    def _static_fill_text(t, width, indent):
-        t = " ".join([s for s in t.replace("\t", " ").strip("\t ").split(" ")\
-            if len(s) > 0]).replace("\n ", "\n").replace(" \n", " ")
-        ts = re.sub("([^\n])\n([^\n])", "\\1 \\2", t).split("\n\n")
-        result = [textwrap.fill(paragraph, width,
-            initial_indent=indent, subsequent_indent=indent)\
-            for paragraph in ts]
-        return "\n\n".join(result).replace("[b]",
-        "\033[1m").replace("[/b]", "\033[21m")
-
-    def _fill_text(self, t, width, indent):
-        return self._static_fill_text(t, width, indent)
+from informationnode.helper import check_if_node_dir, check_if_node_runs
+from informationnode.helper import DoubleLineBreakFormatter
 
 parser = argparse.ArgumentParser(description=\
     "Tool to create and manage information nodes. "+\
     "This tool is free software. "+\
-    "See LICENSE.txt for license and copying information.",
+    "See LICENSE.txt for license and warranty information.",
     formatter_class=DoubleLineBreakFormatter)
 action_info_list = [
     ("node", "<node-folder> [<[interface:]port>]",
@@ -484,65 +467,11 @@ for arg in sys.argv[1:]:
         break
     main_args.append(arg)
 args = parser.parse_args(main_args)
+
+# print faq if specified somewhere in the later args:
 if args.faq:
     print_faq()
     sys.exit(0)
-
-def check_if_node_dir(path, allow_new=False):
-    if os.path.exists(path):
-        if not os.path.isdir(path):
-            print("information-node: error: specified node folder is " +\
-                "not a directory", file=sys.stderr)
-            return False
-        contents = os.listdir(path)
-        if len(contents) == 0:
-            # empty directory.
-            if allow_new:
-                return True
-            else:
-                print("information-node: error: specified node folder is " +\
-                    "not a valid information node", file=sys.stderr)
-                return False
-        else:
-            # check if a valid information node:
-            if not os.path.exists(os.path.join(path, "storage")) or \
-                    not os.path.exists(os.path.join(path, "identity.secret")):
-                print("information-node: error: specified node folder is " +\
-                    "not a valid information node", file=sys.stderr)
-                return False
-            return True
-    else:
-        if not allow_new:
-            print("information-node: error: specified node folder " +\
-                "doesn't exist", file=sys.stderr)
-            return False
-
-        # clean up path a bit:
-        path = os.path.normpath(os.path.abspath(path))
-        if path.startswith("//"):
-            path = path[1:]
-        while path.endswith("/"):
-            path = path[:-1]
-        while (platform.system().lower() == "windows" and\
-                path.endswith("\\")):
-            path = path[:-1]
-
-        # find out whether the parent dir exists:
-        base_dir = os.path.dirname(path)
-        if not os.path.exists(base_dir) or not os.path.isdir(base_dir):
-            print("information-node: error: cannot create node at " +\
-                "specified location because parent directory doesn't"
-                " exist: " + str(base_dir), file=sys.stderr)
-            return False
-
-        # create directory as new empty dir:
-        try:
-            os.mkdir(path)
-        except OSError as e:
-            print("information-node: error: cannot create node at " +\
-                "specified location: " + str(e))
-            return False
-        return True
 
 try:
     from Crypto.PublicKey import RSA
@@ -627,7 +556,8 @@ if args.action == "node":
             adr = ipaddress.ip_address(ip_part)
         except ValueError:
             print("information-node: error: supplied listen interface "+\
-                "has invalid address - not a valid IP address")
+                "has invalid address - not a valid IP address",
+                file=sys.stderr)
             sys.exit(1)
 
         listen_ip = ip_part
@@ -637,7 +567,9 @@ if args.action == "node":
     node_folder = args.node_folder
 
     # check if node directory is valid:
-    if not check_if_node_dir(node_folder, allow_new=True):
+    (result, msg) = check_if_node_dir(node_folder, allow_new=True)
+    if result != True:
+        print("information-node: error: " + msg, file=sys.stderr)
         sys.exit(1)
          
     # check if node dir is empty and we need to initialise it:
@@ -657,52 +589,15 @@ if args.action == "node":
         os.mkdir(os.path.join(node_folder, "logs"))
 
     # check if pid file exists:
-    if os.path.exists(os.path.join(node_folder, "pidfile")):
-        # open it up to check for the running process:
-        f = open(os.path.join(node_folder, "pidfile"), "rb")
-        contents = f.read()
-        f.close()
-
-        # check if valid pid:
-        try:
-            pidnumber = int(contents)
-        except ValueError:
-            pidnumber = None
-        if pidnumber == None or pidnumber < 1:
-            print("information-node: error: pidfile has invalid contents. "+\
-                "Check if this node has already a process running, and if "+\
-                "you are sure this is not the case, remove the pidfile.",\
-                file=sys.stderr)
-            sys.exit(1)
-
-        # check if a process with this pid is running:
-        def check_process_running(pid):
-            if platform.system() == "windows":
-                PROCESS_QUERY_INFROMATION = 0x1000
-                processHandle = ctypes.windll.kernel32.OpenProcess(
-                    PROCESS_QUERY_INFROMATION, 0, pid)
-                if processHandle == 0:
-                    return False
-                else:
-                    ctypes.windll.kernel32.CloseHandle(processHandle)
-                return True 
-            else:
-                try:
-                    os.kill(pid, 0)
-                except OSError:
-                    return False
-                else:
-                    return True
-        if check_process_running(pidnumber):
-            print("information-node: info: data server for this node is " +\
-                "running with pid " + str(pidnumber))
-            print("information-node: info: " +\
-                "nothing to do.", file=sys.stderr)
-            sys.exit(0)
-        
-        print("information-node: warning: removing stale " +\
-            "pidfile with pid: " + str(pidnumber))
-        os.remove(os.path.join(node_folder, "pidfile"))
+    (result, msg) = check_if_node_runs(node_folder) 
+    if result == None:
+        print("information-node: error: " + msg, file=sys.stderr)
+        sys.exit(1)
+    if result:
+        print("information-node: info: data server for this node is " +\
+            "running with pid " + str(msg))
+        print("information-node: info: nothing to do.")
+        sys.exit(0)
 
     print("information-node: info: " +\
         "preparing communications socket for daemon...")
