@@ -3,7 +3,7 @@
 
 This project offers a new concept of **information nodes** for keeping your
 data synchronized between various locations (cloud storage if you will) and
-safe with encryption.
+keeping data safe with the help of encryption.
 
 It supports POSIX-systems (Linux, BSD, Mac OS X, ..) and Microsoft Windows.
 
