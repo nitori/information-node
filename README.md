@@ -34,11 +34,7 @@ graphical viewer to assist you with managing your nodes.
 
 ## Windows
 
-1. Install latest Python 3 release for windows: https://www.python.org/downloads/windows/
-
-2. Download this project as .zip if you haven't already: https://github.com/information-node/information-node/archive/master.zip
-
-3. Run viewer.bat and enter the python installation path when it asks you
+Run viewer.bat
 
 ## Linux / BSD / Mac OS X ...
 
@@ -71,7 +67,7 @@ only possible from your local trusted laptop or with a secured key file you
 have on your local usb stick and not in the cloud.
 
 
-# What exact data types and protocols are supported?
+# What data types/protocols are supported?
 
 At this moment, the following data types and protocols can be handled by
 an information node network:
@@ -79,4 +75,15 @@ an information node network:
 * regular files (similar to Dropbox/syncthing)
 
 Please help us expand this list! Volunteer work wanted!
+
+
+# How does this all work?
+
+The technology behind the project is the following:
+
+* Python 3 - http://www.python3.org
+
+
+
+
 
