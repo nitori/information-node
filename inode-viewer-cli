@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
 from informationnode.helper import check_if_node_dir, check_if_node_runs
+from informationnode.helper import get_api_socket_for_node
 from informationnode.helper import DoubleLineBreakFormatter
 import os
 import platform
@@ -98,27 +99,14 @@ if args.action == "raw-cmd":
     args = subparser.parse_args(subcmd_args)
     setattr(args, "node_folder", getattr(args, "node-folder"))
 
-    # check if this is a valid node:
-    result = check_if_node_dir(args.node_folder)
-    if result != True:
-        print("inode-viewer-cli: error: " + result + ": " +\
-            args.node_folder) 
-        sys.exit(1)
-
-    # check if node runs:
-    (result, msg) = check_if_node_runs(node_folder)
-    if result == None:
-        print("inode-viewer-cli: error: " + msg, file=sys.stderr)
-        sys.exit(1)
+    (result, socket) = get_api_socket_for_node(args.node_folder)
     if not result:
-        print("inode-viewer-cli: error: the data server of this "+\
-            "node isn't running.", file=sys.stderr)
+        # whoops, didn't work.
+        print("inode-viewer-cli: error: " + socket, file=sys.stderr)
         sys.exit(1)
-
-    # open up the unix file socket (linux) or the according port (windows):
-    if platform.system().lower() == "windows":
-
-    else:     
+    
+    # read JSON input from command line:
+    
 else:
     if args.action in action_info:
         print("Dear user,")

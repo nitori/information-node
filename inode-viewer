@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+
+'''
+information-node - an advanced tool for data synchronization
+Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
+
+import os
+import platform
+import sys
+import textwrap
+
+import tkinter
+import tkinter
+import tkinter.messagebox as tkMessageBox
+
+# check whether gtk is present:
+gtk_available = True
+try:
+    from gi.repository import Gtk
+except ImportError:
+    gtk_available = False
+
+if platform.system().lower() == "windows":
+    if not gtk_available:
+        # display notice and install it
+        root = tkinter.Tk()
+        root.withdraw()
+        tkMessageBox.showinfo("IMPORTANT",
+            textwrap.dedent('''\
+            
+            *** IMPORTANT PLEASE READ ***
+            
+            GTK+3 missing.
+            
+            Dear user,
+            
+            you are almost done running the information node viewer!
+            However, you will need to install GTK+3 first.
+            
+            1. Download PyGObject/GTK3 from here: https://wiki.gnome.org/PyGObject (pick "Windows installers with Gtk3 support" and then the newest version)
+            
+            2. During install, click "Add Path" and enter this location:
+                -> ''') + os.path.dirname(sys.executable) + "\n" + \
+            textwrap.dedent('''\
+            
+            3. During install, when shown the packages choices,
+               make sure to check GTK+3
+               
+            4. When you are done, launch the viewer again.'''))
+        sys.exit(0)
+elif not gtk_available:
+    # display notice and install it
+    root = tkinter.Tk()
+    root.withdraw()
+    tkMessageBox.showinfo("Error",
+        textwrap.dedent('''\
+        GTK+3/PyGObject is missing. Please install it.
+        '''))
+    sys.exit(0)    
+        
+# check whether PyCrypto is present:
+pycrypto_available = True
+try:
+    from Crypto.PublicKey import RSA
+except ImportError:
+    pycrypto_available = False
+
+if platform.system().lower() == "windows":
+    if not pycrypto_available:
+        # display notice and install it
+        root = tkinter.Tk()
+        root.withdraw()
+        tkMessageBox.showinfo("IMPORTANT",
+            textwrap.dedent('''\
+            
+            *** IMPORTANT PLEASE READ ***
+            
+            PyCrypto missing.
+            
+            Dear user,
+            
+            you are almost done running the information node viewer!
+            However, you will need to install PyCrypto first.
+            
+            1. Download PyCrypto from here: http://www.voidspace.org.uk/python/modules.shtml#pycrypto
+            (on the site, make sure to pick latest version)
+            
+            2. Pick the download for amd64 and this python version:
+                -> ''') + sys.version + "\n" + \
+            textwrap.dedent('''\
+            
+            3. During install, pick the python with this "Python Directory":
+                -> ''') + os.path.dirname(sys.executable) + "\n" + \
+            textwrap.dedent('''\
+            
+            4. When you are done, launch the viewer again.'''))
+        sys.exit(0)
+elif not pycrypto_available:
+    # display notice and install it
+    root = tkinter.Tk()
+    root.withdraw()
+    tkMessageBox.showinfo("Error",
+        textwrap.dedent('''\
+        PyCrypto is missing. Please install it.
+        '''))
+    sys.exit(0)  
+
+from uilib import uilib_main_loop, uilib_quit
+from informationnode.client.ui.nodewindow import NodeWindow
+
+class App(object):
+    def __init__(self):
+        self.windows = []
+
+    def window_close_event(self, win):
+        self.windows.remove(win)
+        if len(self.windows) == 0:
+            uilib_quit()
+
+    def add_node_window(self, node_path):
+        new_window = NodeWindow(node_path)
+        new_window.register("close", self.window_close_event)
+        self.windows.append(new_window)
+        new_window.show()
+        return new_window
+
+    def run(self):
+        self.add_node_window(None)
+        uilib_main_loop()
+
+app = App()
+app.run()

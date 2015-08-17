@@ -604,19 +604,19 @@ if args.action == "node":
 
     # on unix, create api file socket at this point (for viewer access):
     if platform.system().lower() != "windows":
-        if os.path.exists(os.path.join(node_folder, "access_api.sock")):
+        if os.path.exists(os.path.join(node_folder, "api_access.sock")):
             print("information-node: warning: removing stale file socket",
                 file=sys.stderr)
-            os.remove(os.path.join(node_folder, "access_api.sock"))
+            os.remove(os.path.join(node_folder, "api_access.sock"))
         api_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        api_socket.bind(os.path.join(node_folder, "access_api.sock"))
+        api_socket.bind(os.path.join(node_folder, "api_access.sock"))
 
     # on windows, open up api socket at any port, and write port to file:
     if platform.system().lower() == "windows" and args.foreground:
         api_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         api_socket.bind(("::0", 0))
         port = api_socket.getsockname()[1]
-        f = open(os.path.join(node_folder, "access_api.port"), "wb")
+        f = open(os.path.join(node_folder, "api_access.port"), "wb")
         f.write(str(port).encode("utf8", "ignore"))
         f.close()
 

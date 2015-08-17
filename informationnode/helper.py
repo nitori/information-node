@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import argparse
 import os
 import re
+import socket
 import sys
 import textwrap
 
@@ -158,3 +159,31 @@ def check_if_node_runs(node_folder):
     os.remove(os.path.join(node_folder, "pidfile"))
     return (False, None)
 
+def get_api_socket_for_node(node_folder):
+    """ Tries to open up the node and get an api socket to the data daemon.
+        This will fail if the target is not a valid node, or the data daemon
+        of it isn't running.
+        
+        In case of success, this function returns (True, socket).
+        Otherwise, (False, error_msg) with error_msg being a string.
+    """
+    # check if this is a valid node:
+    result = check_if_node_dir(node_folder)
+    if result != True:
+        return (False, result)
+
+    # check if node runs:
+    (result, msg) = check_if_node_runs(node_folder)
+    if result == None:  # ambiguous breakage (node in invalid state/..)
+        return (False, msg)
+    if not result:  # node not running
+        return (False, msg)
+
+    # open up the unix file socket (linux) or the according port (windows):
+    if platform.system().lower() == "windows":
+        f = open(os.path.join(node_folder, "api_access.port"), "rb")
+        
+    else: 
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(os.path.join(node_folder, "api_access.sock"))
+ 
