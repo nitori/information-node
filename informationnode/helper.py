@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import argparse
 import os
+import platform
 import re
 import socket
 import sys
@@ -168,16 +169,16 @@ def get_api_socket_for_node(node_folder):
         Otherwise, (False, error_msg) with error_msg being a string.
     """
     # check if this is a valid node:
-    result = check_if_node_dir(node_folder)
+    (result, msg) = check_if_node_dir(node_folder)
     if result != True:
-        return (False, result)
+        return (False, msg)
 
     # check if node runs:
     (result, msg) = check_if_node_runs(node_folder)
     if result == None:  # ambiguous breakage (node in invalid state/..)
         return (False, msg)
     if not result:  # node not running
-        return (False, msg)
+        return (False, "data server of specified node isn't running")
 
     # open up the unix file socket (linux) or the according port (windows):
     if platform.system().lower() == "windows":
@@ -186,4 +187,4 @@ def get_api_socket_for_node(node_folder):
     else: 
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.connect(os.path.join(node_folder, "api_access.sock"))
- 
+        return (True, s) 

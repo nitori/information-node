@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 from gi.repository import Gtk
-import uilib
+import informationnode.uilib as uilib
+import os
+import sys
 
 class NodeWindow(uilib.Window):
     def __init__(self, node_path):
@@ -34,61 +36,147 @@ class NodeWindow(uilib.Window):
         self.add(self.menu)
         self.notebook = self.build_notebook()
         self.add(self.notebook, expand=True)
-    
+
+        self.set_node_opened(False)    
+
     def build_notebook(self):
         notebook = uilib.Notebook()
         
         # add tab:
-        new_label = uilib.Label("Welcome tab contents")
-        notebook.add(new_label, "Welcome")
-        
+        new_tab_contents = uilib.HBox()
+        notebook.add(new_tab_contents, "Welcome")
+
+        new_tab_box = uilib.VBox(spacing=5)
+        new_tab_contents.add(new_tab_box, expand=False)
+
+        self.welcome_tab_recent_node = new_tab_box.add(
+            uilib.RadioButton(
+            "Open a recently opened information node:"))
+        self.welcome_tab_open_node_disk = new_tab_box.add(
+            uilib.RadioButton(
+            "Open a information node on the local disk...",
+            group=self.welcome_tab_recent_node))
+        self.welcome_tab_create_node = new_tab_box.add(
+            uilib.RadioButton("Create a new information node",
+            group=self.welcome_tab_open_node_disk))
+
+        # add spacer:
+        new_tab_box.add(uilib.HBox(), end=True, expand=True, fill=False)
+
+        # add button box:
+        button_hbox = uilib.HBox()
+        new_tab_box.add(button_hbox, end=True)
+
+        do_it = uilib.Button("Go!")
+        button_hbox.add(do_it)
+
         return notebook
 
-    def nodemenu_open(self):
+    def set_node_opened(self, opened):
+        if opened:
+            self.menu.nodemenu.close.enable()
+        else:
+            self.menu.nodemenu.close.disable()
+
+    def nodemenu_open(self, widget):
         print("TEST")
-        
-    def nodemenu_create(self):
+
+    def nodemenu_open_remote(self, widget):
+        print("TEST")        
+
+    def nodemenu_create(self, widget):
         print("TEST")
-    
-    def aboutmenu_about(self):
-        pass
-        
+
+    def nodemenu_close(self, widget):
+        print("TEST")    
+
+    def nodemenu_quit(self, widget):
+        sys.exit(0)
+
+    def aboutmenu_about(self, widget):
+        about = uilib.AboutDialog()
+        about.set_program_name("Information Node Viewer")
+        about.set_copyright(
+            "(C) 2015 Information Node Development Team")
+        about.set_website(
+            "https://github.com/information-node/information-node")
+        about.set_version("0.1")
+        about.set_comments("Universal data synchronization software")
+
+        # load up and embed authors list:
+        try:
+            import pkg_resources
+            authors = pkg_resources.resource_string("informationnode",
+                os.path.join("data", "AUTHORS.md")).decode("utf-8", "ignore")
+        except FileNotFoundError:
+            authors = open(os.path.join(os.path.dirname(__file__),
+                "..", "..", "..", "AUTHORS.md"),
+                "r").read()  # go up from inode.client.ui
+        authors = [l[1:].strip() for l in authors.splitlines() \
+            if l.startswith("-")]
+        about.set_authors(authors)
+
+        # load up and embed license:
+        try:
+            import pkg_resources
+            license = pkg_resources.resource_string("informationnode",
+                os.path.join("data", "LICENSE.txt")).decode("utf-8", "ignore")
+        except FileNotFoundError:
+            license = open(os.path.join(os.path.dirname(__file__),
+                "..", "..", "..", "LICENSE.txt"),
+                "r").read()  # go up from inode.client.ui
+        about.set_license(license)
+
+        about.run()
+        about.destroy()
+
     def build_menu(self):
         menu = uilib.MenuBar()
 
         # add node menu:        
-        menu.nodemenulabel = uilib.MenuItem("Node")
+        menu.nodemenulabel = uilib.MenuItem("_Node")
         menu.add(menu.nodemenulabel)
         menu.nodemenu = uilib.Menu()
         menu.nodemenulabel.add(menu.nodemenu)
 
         # node menu contents:
-        menu.nodemenu.open = uilib.MenuItem("Open node...")
+        menu.nodemenu.open = uilib.MenuItem("_Open Node...")
         menu.nodemenu.open.register("click",
             self.nodemenu_open)
         menu.nodemenu.add(menu.nodemenu.open)
+        menu.nodemenu.open_remote = uilib.MenuItem(
+            "_Remote-Connect To Node From Other Location...")
+        menu.nodemenu.open_remote.register("click",
+            self.nodemenu_open_remote)
+        menu.nodemenu.add(menu.nodemenu.open_remote)
         menu.nodemenu.add(uilib.SeparatorMenuItem())
-        menu.nodemenu.create = uilib.MenuItem("Create new node...")
+        menu.nodemenu.create = uilib.MenuItem("Create _New Node...")
         menu.nodemenu.create.register("click",
             self.nodemenu_create)
-        menu.nodemenu.add(menu.nodemenu.create)
         menu.nodemenu.add(uilib.SeparatorMenuItem())
-        menu.nodemenu.quit = uilib.MenuItem("Quit")
+        menu.nodemenu.close = uilib.MenuItem("_Close Current Node")
+        menu.nodemenu.close.register("click",
+            self.nodemenu_close)
+        menu.nodemenu.add(menu.nodemenu.close)
+        menu.nodemenu.add(uilib.SeparatorMenuItem())
+        menu.nodemenu.quit = uilib.MenuItem("_Quit")
+        menu.nodemenu.quit.register("click",
+            self.nodemenu_quit)
         menu.nodemenu.add(menu.nodemenu.quit)
         
         # add about menu:        
-        menu.aboutmenulabel = uilib.MenuItem("About")
+        menu.aboutmenulabel = uilib.MenuItem("_About")
         menu.add(menu.aboutmenulabel)
         menu.aboutmenu = uilib.Menu()
         menu.aboutmenulabel.add(menu.aboutmenu)
 
         # node menu contents:
         menu.aboutmenu.about = uilib.MenuItem(
-            "About information node viewer...")
+            "_About Information Node Viewer...")
         menu.aboutmenu.about.register("click",
             self.aboutmenu_about)
         menu.aboutmenu.add(menu.aboutmenu.about)
  
         return menu
-    pass
+
 

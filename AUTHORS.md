@@ -1,5 +1,5 @@
 
-# information-node Development Team
+# Information Node Development Team
 
 Those are the authors/contributors to this project:
 

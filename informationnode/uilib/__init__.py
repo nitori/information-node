@@ -1,7 +1,7 @@
 
 '''
 information-node - an advanced tool for data synchronization
-Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+Copyright (C) 2015  Information Node Development Team (see AUTHORS.md)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -60,22 +60,26 @@ class WidgetMixin(object):
                 return True
         return False
 
+    def enable(self):
+        self.set_sensitive(True)
+
+    def disable(self):
+        self.set_sensitive(False)
+
 class Window(Gtk.Window, WidgetMixin):
     def __init__(self):
         super(Window, self).__init__()
         self.box = Gtk.VBox()
         self.connect("delete-event", lambda ignore1, ignore2: \
-            self._close_event())
+            self.trigger("close"))
         super(Window, self).add(self.box)
-
-    def _close_event(self):
-        self.trigger("close")
 
     def add(self, widget, expand=False):
         if expand:
             self.box.pack_start(widget, True, True, 0)
         else:
             self.box.pack_start(widget, False, False, 0)
+        return widget
 
     def show(self):
         self.show_all()
@@ -84,21 +88,39 @@ class VBox(Gtk.VBox, WidgetMixin):
     def __init__(self, spacing=0):
         super(VBox, self).__init__(spacing=spacing)
 
-    def add(self, widget, expand=False):
-        if expand:
-            self.pack_start(widget, True, True, 0)
+    def add(self, widget, expand=False, end=False, fill=None, padding=5):
+        if fill == None:
+            fill = expand
+        if not end:
+            if expand:
+                self.pack_start(widget, True, fill, padding=padding)
+            else:
+                self.pack_start(widget, False, fill, padding=padding)
         else:
-            self.pack_start(widget, False, False, 0)
+            if expand:
+                self.pack_start(widget, True, fill, padding=padding)
+            else:
+                self.pack_start(widget, False, fill, padding=padding)
+        return widget
 
 class HBox(Gtk.HBox, WidgetMixin):
     def __init__(self, spacing=0):
         super(HBox, self).__init__(spacing=spacing)
 
-    def add(self, widget, expand=False):
-        if expand:
-            self.pack_start(widget, True, True, 0)
+    def add(self, widget, expand=False, end=False, fill=None, padding=5):
+        if fill == None:
+            fill = expand
+        if not end:
+            if expand:
+                self.pack_start(widget, True, fill, padding=padding)
+            else:
+                self.pack_start(widget, False, fill, padding=padding)
         else:
-            self.pack_start(widget, False, False, 0)
+            if expand:
+                self.pack_end(widget, True, fill, padding=padding)
+            else:
+                self.pack_end(widget, False, fill, padding=padding)
+        return widget
 
 class TextEntry(Gtk.Entry, WidgetMixin):
     def __init__(self, text=""):
@@ -113,16 +135,17 @@ class Menu(Gtk.Menu, WidgetMixin):
                 "arbitrary kind of widgets, " +\
                 "just MenuItem widgets are allowed")
         super(Menu, self).append(menu_entry)
+        return menu_entry
 
 class MenuItem(Gtk.MenuItem, WidgetMixin):
     def __init__(self, text=""):
         super(MenuItem, self).__init__(label=text)
+        self.set_text(text)
+        self.connect("activate", lambda button: self.trigger("click"))
 
     def set_text(self, text):
-        self.remove(self._label)
-        self._label.destroy()
-        self._label = Gtk.Label(text)
-        super(MenuItem, self).add(self._label)
+        self.set_use_underline(True)
+        super(MenuItem, self).set_label(text)
 
     def add(self, menu):
         if not isinstance(menu, Menu):
@@ -130,6 +153,7 @@ class MenuItem(Gtk.MenuItem, WidgetMixin):
                 "arbitrary kind of widgets, " +\
                 "just Menu widgets are allowed")
         super(MenuItem, self).set_submenu(menu)
+        return menu
 
 class SeparatorMenuItem(Gtk.SeparatorMenuItem, WidgetMixin):
     def add(self, menu):
@@ -138,6 +162,7 @@ class SeparatorMenuItem(Gtk.SeparatorMenuItem, WidgetMixin):
                 "arbitrary kind of widgets, " +\
                 "just Menu widgets are allowed")
         super(MenuItem, self).set_submenu(menu)
+        return menu
 
 class MenuBar(Gtk.MenuBar, WidgetMixin):
     def add(self, menu_entry):
@@ -146,6 +171,7 @@ class MenuBar(Gtk.MenuBar, WidgetMixin):
                 "arbitrary kind of widgets, " +\
                 "just MenuItem widgets are allowed")
         self.append(menu_entry)       
+        return menu_entry
 
 class Label(Gtk.Label, WidgetMixin):
     pass
@@ -161,4 +187,24 @@ class Notebook(Gtk.Notebook, WidgetMixin):
             tab_title = "Tab " + str(self.new_tab_id)
         label = Gtk.Label(label=tab_title)
         self.append_page(tab_widget, label)
+        return tab_widget
+
+class RadioButton(Gtk.RadioButton, WidgetMixin):
+    def __new__(cls, text=None, group=None, **kwargs):
+        if text == None:
+            return super(Gtk.RadioButton, cls).__new__(cls, group,
+                *args, **kwargs)
+        return Gtk.RadioButton.new_with_label_from_widget(\
+            group, text)
+
+    def __init__(self, *args, **kwargs):
+        super(RadioButton, self).__init__(*args, **kwargs)
+        self.connect("clicked", lambda button: self.trigger("click"))
+        self.connect("toggled", lambda button: self.trigger("click"))
+
+class Button(Gtk.Button, WidgetMixin):
+    pass
+
+class AboutDialog(Gtk.AboutDialog, WidgetMixin):
+    pass
 

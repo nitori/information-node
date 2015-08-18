@@ -5,6 +5,10 @@ This project offers a new concept of **information nodes** for keeping your
 data synchronized between various locations (cloud storage if you will) and
 keeping data safe with the help of encryption.
 
+An information node is a directory containing all its contents in optimal
+storage form along with a process which serves the data or synchronizes it
+with other nodes.
+
 The project supports POSIX-systems (Linux, BSD, Mac OS X, ..) and Microsoft
 Windows.
 

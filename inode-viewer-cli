@@ -22,8 +22,11 @@ import argparse
 from informationnode.helper import check_if_node_dir, check_if_node_runs
 from informationnode.helper import get_api_socket_for_node
 from informationnode.helper import DoubleLineBreakFormatter
+import json
+import logging
 import os
 import platform
+import selectors
 import sys
 import textwrap
 
@@ -96,9 +99,26 @@ if args.action == "raw-cmd":
         formatter_class=DoubleLineBreakFormatter)
     subparser.add_argument("node-folder",
         help="the node to which this command should be sent")
+    subparser.add_argument("--bytes", default="-1",
+        help="the size of the input JSON you will provide in "+\
+        "exact bytes. Providing this speeds up input processing " +\
+        "for large inputs considerably.")
     args = subparser.parse_args(subcmd_args)
     setattr(args, "node_folder", getattr(args, "node-folder"))
 
+    # get input bytes length if specified:
+    try:
+        input_bytes = int(args.bytes)
+    except ValueError:
+        print("inode-viewer-cli: error: --bytes needs to be an integer",
+            file=sys.stderr)
+        sys.exit(1)
+    if input_bytes < -1 or input_bytes == 0:
+        print("inode-viewer-cli: error: input length in bytes needs "+\
+            "to be positive number", file=sys.stderr)
+        sys.exit(1)
+
+    # get api socket for the node:
     (result, socket) = get_api_socket_for_node(args.node_folder)
     if not result:
         # whoops, didn't work.
@@ -106,7 +126,39 @@ if args.action == "raw-cmd":
         sys.exit(1)
     
     # read JSON input from command line:
-    
+    if input_bytes == -1:
+        # Supecial case where we don't know the input length.
+        # We need to periodically check if what we already got is valid
+        # complete JSON.
+        if platform.system().lower() == "windows":
+            print("inode-viewer-cli: error: raw-cmd without specified "+\
+                "input byte length not supported on windows. " +\
+                "Use --bytes")
+            sys.exit(1)
+        input_selector = selectors.DefaultSelector()
+        input_selector.register(sys.stdin, EVENT_READ)
+        input_data = ""
+        while True:
+            events = input_selector.select()
+            for key, mask in events:
+                try:
+                    data = key.fileobj.read(1024)
+                except OSError:
+                    # end of stream or similar.
+                    json_obj = json.loads(input_data)
+                    break
+                if len(data) == 0:
+                    # end of stream.
+                    json_obj = json.loads(input_data)
+                    break
+                input_data += data
+                # see if this is already valid json:
+                try:
+                    json_obj = json.loads(input_data)
+                    break
+                except ValueError:
+                    continue  # nope. continue parsing
+        logging.debug("Parsed obj: " + str(json_obj))
 else:
     if args.action in action_info:
         print("Dear user,")

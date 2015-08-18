@@ -2,7 +2,7 @@
 
 '''
 information-node - an advanced tool for data synchronization
-Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+Copyright (C) 2015  Information Node Development Team (see AUTHORS.md)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -328,6 +328,11 @@ faq_text = textwrap.dedent('''\
 
     [b]== What is an information node? ==[/b]
 
+    An information node is a directory containing all its contents in optimal
+    storage form along with a process which serves the data or synchronizes it
+    with other nodes.
+ 
+
     Information nodes simply store
     data and share it amongst themselves when linked with each other
     over encrypted connections
@@ -564,7 +569,7 @@ if args.action == "node":
         if port != None:
             listen_port = port
 
-    node_folder = args.node_folder
+    node_folder = os.path.abspath(args.node_folder)
 
     # check if node directory is valid:
     (result, msg) = check_if_node_dir(node_folder, allow_new=True)
@@ -668,7 +673,7 @@ if args.action == "node":
     f.close()
 
     # if we arrive here, we are in the daemon process/thread. run daemon:
-    Daemon().run(api_socket)
+    Daemon(node_folder).run(api_socket)
 else:
     if args.action in action_info:
         print("Dear user,")

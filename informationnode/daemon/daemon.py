@@ -17,8 +17,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+import datetime
 import json
 import logging
+import os
 import platform
 import queue
 import signal
@@ -79,15 +81,31 @@ class FileSocketApiClient(object):
         return False
 
 class Daemon(object):
-    def __init__(self):
+    def __init__(self, node_path):
+        self.node_path = node_path
         self.api_processor_terminated = False
         self.terminate = False
+
+        # set up signal handlers:
         if platform.system().lower() != "windows":
-            signal.signal(signal.SIGTERM, self.sigterm_handler)
-            signal.signal(signal.SIGHUP, self.sighup_handler)
+            signal.signal(signal.SIGTERM, lambda signal, info: \
+                self.sigterm_handler(signal, info))
+            signal.signal(signal.SIGHUP, lambda signal, info: \
+                self.sighup_handler(signal, info))
+
+        # set up logging to file:
+        logging.basicConfig(filename=os.path.join(node_path, "logs",
+                "log-" +  datetime.datetime.now().strftime("%Y-%m-%d") +\
+                ".txt"),
+            filemode='a',
+            format='%(asctime)s %(levelname)s %(message)s',
+            datefmt='%H:%M:%S',
+            level=logging.DEBUG)
+        logging.info("Data server initialized.")
 
     def sigterm_handler(self, signal, unused_info):
         """ SIGTERM handler which will initiate shutdown. """
+        logging.debug("sigterm received")
         self.terminate = True
 
     def sighup_handler(self, signal, unused_info):
@@ -101,39 +119,54 @@ class Daemon(object):
         """ Internal api processor thread. This thread does the actual I/O
             work on disk.
         """
-        while not self.terminate:
-            try:
-                next_msg = self.internal_api_queue.get(timeout=500)
-            except queue.Empty:
-                continue
-            logging.debug("got internal api message: " + str(next_msg))
-            try:
-                if msg["action"] == "":
-                    pass
-            except Exception as e:
-                logging.error("Error in Daemon.internal_api_processor: " +\
-                    str(e))
-        self.api_processor_terminated = True
+        try:
+            while not self.terminate:
+                print("internal_api_processor. self.terminate: " + str(\
+                    self.terminate))
+                try:
+                    next_msg = self.internal_api_queue.get(timeout=0.5)
+                except queue.Empty:
+                    continue
+                logging.debug("got internal api message: " + str(next_msg))
+                try:
+                    if msg["action"] == "":
+                        pass
+                except Exception as e:
+                    logging.error("Error in Daemon.internal_api_processor: " +\
+                        str(e))
+            self.api_processor_terminated = True
+        except Exception as e:
+            logging.exception("unhandled exception in internal_api_processor")
+            raise e
 
     def api_socket_processor(self):
-        clients = {}
-        while True:
-            # add new client(s):
-            c, addr = s.accept()
-            clients[c] = FileSocketApiclient(c, addr)
-            
-            # throw away clients that have been terminated:
-            remove_clients = []
-            for client_k in clients:
-                if clients[client_k].terminated():
-                    remove_clients.append(client_k)
-            for client_k in remove_clients:
-                del(clients[client_k])
+        """ Deals with the outside requests coming into the api socket
+            (api_access.sock). Hands off the actual work to the internal api
+            processor later by forming the according internal JSON requests.
+        """
+        try:
+            self.api_socket.listen(1)
+            clients = {}
+            while True:
+                # add new client(s):
+                c, addr = self.api_socket.accept()
+                clients[c] = FileSocketApiclient(c, addr)
+                
+                # throw away clients that have been terminated:
+                remove_clients = []
+                for client_k in clients:
+                    if clients[client_k].terminated():
+                        remove_clients.append(client_k)
+                for client_k in remove_clients:
+                    del(clients[client_k])
+        except Exception as e:
+            logging.exception("unhandled exception in api_socket_processor")
 
     def run(self, api_socket):
         """ Run the data server which handles local api requests by the
             viewers, operates the gateways and syncs with remote nodes.
         """
+        logging.debug("Launching other processing threads...")
         # internal api processor that handles all the actual work:
         self.internal_api_queue = queue.Queue()
         self.internal_api_thread = threading.Thread(target=\
@@ -146,7 +179,13 @@ class Daemon(object):
             self.api_socket_processor)
         self.api_thread.start()
 
+        logging.debug("Data server main thread starting.")
         # process continuous timed actions:
-        while not self.terminate and not self.api_processor_terminated:
+        while not self.terminate or not self.api_processor_terminated:
+            logging.debug("self.terminate: " + str(self.terminate))
+            logging.debug("self.api_processor_terminated: " + str(\
+                self.api_processor_terminated))
             time.sleep(1)
-        sys.exit(0)
+        logging.info("Shutting down data server.")
+        os._exit(0)
+
