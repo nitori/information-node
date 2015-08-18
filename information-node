@@ -328,7 +328,7 @@ faq_text = textwrap.dedent('''\
 
     [b]== What is an information node? ==[/b]
 
-    An information node is a directory containing all its contents in optimal
+    An information node is a directory with data as a database in optimal
     storage form along with a process which serves the data or synchronizes it
     with other nodes.
  
