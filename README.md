@@ -90,7 +90,13 @@ The technology behind the project is the following:
 * Python 3 - https://www.python3.org
 
 * PyCrypto - https://www.dlitz.net/software/pycrypto/
+  (the files are encrypted with an AES key which itself is encrypted using
+  RSA)
 
-* PyGObject/GTK3 - https://wiki.gnome.org/PyGObject (for the inode-viewer)
+* PyOpenSSL - https://pypi.python.org/pypi/pyOpenSSL
+  (TLS encryption for node-to-node communication)
+
+* PyGObject/GTK3 - https://wiki.gnome.org/PyGObject
+  (for the inode-viewer)
 
 
