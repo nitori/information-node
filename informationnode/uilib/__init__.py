@@ -74,11 +74,11 @@ class Window(Gtk.Window, WidgetMixin):
             self.trigger("close"))
         super(Window, self).add(self.box)
 
-    def add(self, widget, expand=False):
+    def add(self, widget, expand=False, padding=5):
         if expand:
-            self.box.pack_start(widget, True, True, 0)
+            self.box.pack_start(widget, True, True, padding)
         else:
-            self.box.pack_start(widget, False, False, 0)
+            self.box.pack_start(widget, False, False, padding)
         return widget
 
     def show(self):
@@ -194,8 +194,11 @@ class RadioButton(Gtk.RadioButton, WidgetMixin):
         if text == None:
             return super(Gtk.RadioButton, cls).__new__(cls, group,
                 *args, **kwargs)
-        return Gtk.RadioButton.new_with_label_from_widget(\
+        button = Gtk.RadioButton.new_with_label_from_widget(\
             group, text)
+        button.__class__ = type("RadioButton", (Gtk.RadioButton, WidgetMixin),
+            {})
+        return button
 
     def __init__(self, *args, **kwargs):
         super(RadioButton, self).__init__(*args, **kwargs)
@@ -203,6 +206,11 @@ class RadioButton(Gtk.RadioButton, WidgetMixin):
         self.connect("toggled", lambda button: self.trigger("click"))
 
 class Button(Gtk.Button, WidgetMixin):
+    def __init__(self, *args, **kwargs):
+        super(Button, self).__init__(*args, **kwargs)
+        self.connect("clicked", lambda button: self.trigger("click"))
+
+class TextEntry(Gtk.Entry, WidgetMixin):
     pass
 
 class AboutDialog(Gtk.AboutDialog, WidgetMixin):

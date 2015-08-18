@@ -18,7 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 from gi.repository import Gtk
+from informationnode.helper import check_if_node_dir, check_if_node_runs
 import informationnode.uilib as uilib
+from informationnode.client.ui.createnodewindow import CreateNodeWindow
 import os
 import sys
 
@@ -49,16 +51,23 @@ class NodeWindow(uilib.Window):
         new_tab_box = uilib.VBox(spacing=5)
         new_tab_contents.add(new_tab_box, expand=False)
 
+        new_tab_box.add(uilib.Label("Welcome! Choose what to do:"))
         self.welcome_tab_recent_node = new_tab_box.add(
             uilib.RadioButton(
-            "Open a recently opened information node:"))
+            "Open recently opened node:"))
+        self.welcome_tab_recent_node.disable()
         self.welcome_tab_open_node_disk = new_tab_box.add(
             uilib.RadioButton(
-            "Open a information node on the local disk...",
+            "Open local node...",
             group=self.welcome_tab_recent_node))
-        self.welcome_tab_create_node = new_tab_box.add(
-            uilib.RadioButton("Create a new information node",
+        self.welcome_tab_open_node_disk.set_active(True)
+        self.welcome_tab_open_node_remote = new_tab_box.add(
+            uilib.RadioButton(
+            "Open remote node...",
             group=self.welcome_tab_open_node_disk))
+        self.welcome_tab_create_node = new_tab_box.add(
+            uilib.RadioButton("Create a new node",
+            group=self.welcome_tab_open_node_remote))
 
         # add spacer:
         new_tab_box.add(uilib.HBox(), end=True, expand=True, fill=False)
@@ -67,7 +76,9 @@ class NodeWindow(uilib.Window):
         button_hbox = uilib.HBox()
         new_tab_box.add(button_hbox, end=True)
 
+        # add "Go!" button:
         do_it = uilib.Button("Go!")
+        do_it.register("click", lambda button: self.welcometab_go())
         button_hbox.add(do_it)
 
         return notebook
@@ -85,13 +96,47 @@ class NodeWindow(uilib.Window):
         print("TEST")        
 
     def nodemenu_create(self, widget):
-        print("TEST")
+        create_win = CreateNodeWindow()
+        create_win.set_transient_for(self)
+        create_win.show()
 
     def nodemenu_close(self, widget):
         print("TEST")    
 
     def nodemenu_quit(self, widget):
         sys.exit(0)
+
+    def welcometab_go(self):
+        if self.welcome_tab_open_node_disk.get_active():
+            self.nodemenu_open(None)
+        elif self.welcome_tab_create_node.get_active():
+            self.nodemenu_create(None)
+
+    def nodemenu_open(self, widget):
+        dlg = Gtk.FileChooserDialog("Open up Information Node",
+            self, Gtk.FileChooserAction.SELECT_FOLDER,
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+        response = dlg.run()
+        if response == Gtk.ResponseType.OK:
+            directory = dlg.get_filename()
+            dlg.destroy()
+            print("SHOW OPEN DIALOG: " + str(directory))
+
+            # see if this is a valid node:
+            (result, msg) = check_if_node_dir(directory)
+            if not result:
+                dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
+                    Gtk.ButtonsType.OK,
+                    "Cannot access node")
+                dialog.format_secondary_text(
+                    "Cannot access the specified node: " + str(msg))
+                dialog.run()
+                dialog.destroy()
+                return
+
+        else:
+            dlg.destroy()
 
     def aboutmenu_about(self, widget):
         about = uilib.AboutDialog()
@@ -140,12 +185,12 @@ class NodeWindow(uilib.Window):
         menu.nodemenulabel.add(menu.nodemenu)
 
         # node menu contents:
-        menu.nodemenu.open = uilib.MenuItem("_Open Node...")
+        menu.nodemenu.open = uilib.MenuItem("_Open Local Node...")
         menu.nodemenu.open.register("click",
             self.nodemenu_open)
         menu.nodemenu.add(menu.nodemenu.open)
         menu.nodemenu.open_remote = uilib.MenuItem(
-            "_Remote-Connect To Node From Other Location...")
+            "Connect To Remote Node...")
         menu.nodemenu.open_remote.register("click",
             self.nodemenu_open_remote)
         menu.nodemenu.add(menu.nodemenu.open_remote)
@@ -153,6 +198,7 @@ class NodeWindow(uilib.Window):
         menu.nodemenu.create = uilib.MenuItem("Create _New Node...")
         menu.nodemenu.create.register("click",
             self.nodemenu_create)
+        menu.nodemenu.add(menu.nodemenu.create)
         menu.nodemenu.add(uilib.SeparatorMenuItem())
         menu.nodemenu.close = uilib.MenuItem("_Close Current Node")
         menu.nodemenu.close.register("click",
