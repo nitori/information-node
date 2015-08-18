@@ -7,7 +7,9 @@ keeping data safe with the help of encryption.
 
 An information node is a directory with data as a database in optimal
 storage form along with a process which serves the data or synchronizes it
-with other nodes.
+with other nodes. The contents can be mapped to a regular folder as
+editable files like Dropbox, or synced with e-mail/IMAP services, and
+more.
 
 The project supports POSIX-systems (Linux, BSD, Mac OS X, ..) and Microsoft
 Windows.
