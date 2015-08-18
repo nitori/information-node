@@ -87,9 +87,10 @@ Please help us expand this list! Volunteer work wanted!
 
 The technology behind the project is the following:
 
-* Python 3 - http://www.python3.org
+* Python 3 - https://www.python3.org
 
+* PyCrypto - https://www.dlitz.net/software/pycrypto/
 
-
+* PyGObject/GTK3 - https://wiki.gnome.org/PyGObject (for the inode-viewer)
 
 
