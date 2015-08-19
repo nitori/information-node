@@ -99,8 +99,10 @@ class NodeWindow(uilib.Window):
     def set_node_opened(self, opened):
         if opened:
             self.menu.nodemenu.close.enable()
+            self.menu.logmenu.dataserver.enable()
         else:
             self.menu.nodemenu.close.disable()
+            self.menu.logmenu.dataserver.disable()
 
     def nodemenu_open(self, widget):
         print("TEST")

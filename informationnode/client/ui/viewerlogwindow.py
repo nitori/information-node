@@ -30,3 +30,16 @@ class ViewerLogWindow(uilib.Window):
         self.set_title("Viewer Activity Log")
         self.app = app
 
+        vbox = uilib.VBox()
+        vbox.set_property("margin", 10)
+        self.add(vbox)
+
+        vbox.add(uilib.Label("Due to the sensitive nature of this log, " +\
+            "it needs to be enabled using --debug-history.\nIt will "+\
+            "only be stored in memory until the viewer quits, not on disk."))
+
+        hbox = uilib.HBox()
+        hbox.add(uilib.Label("Show activity for node:"))
+        self.node_choice = hbox.add(uilib.ComboBox())
+
+        vbox.add(hbox)
