@@ -25,10 +25,24 @@ class NodeAction(object):
         self.node_path = node_socket
         self.tool = tool
         self.cmd = cmd
+        self.json_request = json_request
         self._done = False
 
     def run(self):
+        """ Returns (True, json_obj) on success, and
+            (False, error_msg) on failure.
+        """
+        program = subprocess.Popen([self.tool] + self.cmd,
+            stdout=subprocess.PIPE,
+            stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdout_data, stderr_data) = program.communicate(
+            input=self.json_request)
         self._done = True
+        try:
+            json_obj = json.loads(stdout_data)
+        except ValueError:
+            return (False, stdout_data)
+        return (True, json_obj)
 
     @property
     def done(self):

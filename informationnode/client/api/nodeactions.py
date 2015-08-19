@@ -24,7 +24,8 @@ class NodeActions(object):
         self.app = app
         self.history = dict()
 
-    def do(self, node_url, json, tool="inode-viewer-cli", cmd="raw-cmd",
+    def do(self, node_url, json, tool="inode-viewer-cli",
+            cmd=["raw-cmd"],
             reason="unspecified"):
         action = NodeAction(node_url, json, tool=tool, cmd=cmd)
         if self.keep_history:
