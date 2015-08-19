@@ -21,7 +21,8 @@ import subprocess
 
 class NodeAction(object):
     def __init__(self, node_path, json_request,
-            tool="inode-viewer-cli", cmd="raw-cmd"):
+            tool="inode-viewer-cli", cmd="raw-cmd",
+            cmd_args=[]):
         self.node_path = node_socket
         self.tool = tool
         self.cmd = cmd
@@ -32,7 +33,8 @@ class NodeAction(object):
         """ Returns (True, json_obj) on success, and
             (False, error_msg) on failure.
         """
-        program = subprocess.Popen([self.tool] + self.cmd,
+        program = subprocess.Popen([self.tool] + \
+            [self.cmd] + [self.node_path] + self.cmd_args,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout_data, stderr_data) = program.communicate(

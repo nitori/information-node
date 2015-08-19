@@ -31,11 +31,6 @@ class NodeWindow(uilib.Window):
 
         self.app = app
 
-        if node_path == None:
-            self.set_title("Information Node Viewer")
-        else:
-            self.set_title("Information Node: " + node_path)
-        
         self.node_path = node_path
         self.menu = self.build_menu()
         self.add(self.menu)
@@ -100,12 +95,11 @@ class NodeWindow(uilib.Window):
         if opened:
             self.menu.nodemenu.close.enable()
             self.menu.logmenu.dataserver.enable()
+            self.set_title("Node: " + self.node_path)
         else:
             self.menu.nodemenu.close.disable()
             self.menu.logmenu.dataserver.disable()
-
-    def nodemenu_open(self, widget):
-        print("TEST")
+            self.set_title("Information Node Viewer")
 
     def nodemenu_open_remote(self, widget):
         print("TEST")        
@@ -114,10 +108,40 @@ class NodeWindow(uilib.Window):
         create_win = CreateNodeDialog()
         create_win.set_transient_for(self)
         result = create_win.run()
+        fpath = None
+        if result == Gtk.ResponseType.OK:
+            fpath = create_win.get_filename()
         create_win.destroy()
 
+        # create new node if instructed to:
+        if fpath != None:
+            action = self.app.actions.do(
+                fpath, "", tool="information-node",
+                cmd="node")
+            (result, content) = action.run()
+            if not result:
+                dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
+                    Gtk.ButtonsType.OK,
+                    "Failed to create node")
+                dialog.format_secondary_text(
+                    "Failed to create node: " + str(content))
+                dialog.run()
+                dialog.destroy()
+            else:
+                if self.node_path == None:
+                    # this window has no node opened, open it in here
+                    self.node_path = fpath
+                    self.set_node_opened(True)
+                else:
+                    # open it in a new window:
+                    new_win = NodeWindow(self.app, fpath)
+                    self.app.add_window(new_win)
+
     def nodemenu_close(self, widget):
-        print("TEST")    
+        if self.node_path == None:
+            return
+        self.node_path = None
+        self.set_node_opened(False)    
 
     def nodemenu_quit(self, widget):
         sys.exit(0)
@@ -154,6 +178,16 @@ class NodeWindow(uilib.Window):
                 dialog.destroy()
                 return
 
+            # open the node up:
+            if self.node_path == None:
+                # this window has no node opened, open it in here
+                self.node_path = directory
+                self.set_node_opened(True)
+            else:
+                # open it in a new window:
+                new_win = NodeWindow(self.app, directory)
+                self.app.add_window(new_win)
+            
         else:
             dlg.destroy()
 

@@ -47,6 +47,13 @@ action_info_list = [
     This can be useful if you want to access the node api through an
     automated script.
     ''')),
+    ("ping", "<node-folder>",
+    "send a ping to the node's data server to see if it's still alive",
+    textwrap.dedent('''\
+    Send a ping to the node's data server to see if it's still alive.
+    Returns exit code 0 if the ping was successfully responded to by the
+    data server, otherwise exit code 1.
+    ''')),
 ]
 
 # make a nice access dictionary of the action info:
@@ -80,6 +87,19 @@ parser.add_argument("argument", nargs="*",
 if len(" ".join(sys.argv[1:]).strip()) == 0:
     parser.print_usage()
     sys.exit(1)
+
+# helper function to read response from socket
+def get_socket_response(socket):
+    response_bytes = ""
+    while True:
+        try:
+            response_bytes += socket.recv(512)
+        except OSError:
+            break
+    try:
+        return json.loads(response_bytes)
+    except ValueError:
+        return None
 
 # extract all arguments not meant for a subcommand:
 main_args = []
@@ -169,16 +189,36 @@ if args.action == "raw-cmd":
     socket.send(json.dumps(json_obj))
     
     # get response:
-    response_bytes = ""
-    while True:
-        try:
-            response_bytes += socket.recv(512)
-        except OSError:
-            break
+    response_obj = get_socket_response()
 
     # print response:
-    print(response_bytes)
+    print(json.dumps(response_obj))
     sys.exit(0)
+elif args.action == "ping":
+    subparser = argparse.ArgumentParser(prog=\
+        os.path.basename(sys.argv[0]) + " ping", description=\
+        action_info["ping"][3],
+        formatter_class=DoubleLineBreakFormatter)
+    subparser.add_argument("node-folder",
+        help="the node of which the data server should be pinged")
+    args = subparser.parse_args(subcmd_args)
+    setattr(args, "node_folder", getattr(args, "node-folder"))
+
+    # get api socket for the node:
+    (result, socket) = get_api_socket_for_node(args.node_folder)
+    if not result:
+        # whoops, didn't work.
+        print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        sys.exit(1)
+
+    # ping the daemon:
+    socket.send(json.dumps({"action":"ping"}))
+    response = get_socket_response()
+    if response["action"] == "pong":
+        print("Pong received.")
+        sys.exit(0)
+    print("Invalid response.")
+    sys.exit(1)
 else:
     if args.action in action_info:
         print("Dear user,")

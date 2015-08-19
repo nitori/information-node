@@ -187,4 +187,6 @@ def get_api_socket_for_node(node_folder):
     else: 
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.connect(os.path.join(node_folder, "api_access.sock"))
-        return (True, s) 
+
+    s.settimeout(5.0)
+    return (True, s) 

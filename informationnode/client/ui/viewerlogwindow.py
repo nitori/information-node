@@ -36,10 +36,15 @@ class ViewerLogWindow(uilib.Window):
 
         vbox.add(uilib.Label("Due to the sensitive nature of this log, " +\
             "it needs to be enabled using --debug-history.\nIt will "+\
-            "only be stored in memory until the viewer quits, not on disk."))
+            "only be stored in memory until the viewer quits, not on disk."))\
+            .set_alignment(0, 0.5)
 
         hbox = uilib.HBox()
-        hbox.add(uilib.Label("Show activity for node:"))
-        self.node_choice = hbox.add(uilib.ComboBox())
+        hbox.add(uilib.Label("Show activity for node:")).\
+            set_alignment(0, 0.5)
+        self.node_choice = hbox.add(uilib.ComboBoxText())
+        self.node_choice.append_text("No tracked past activity with any node")
+        self.node_choice.set_active(0)
+        self.node_choice.disable()
 
         vbox.add(hbox)

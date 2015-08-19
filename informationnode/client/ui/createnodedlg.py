@@ -36,12 +36,27 @@ class CreateNodeDialog(uilib.Dialog):
         vbox.add(uilib.Label("Specify the location for your new node:")).\
             set_alignment(0, 0.5)
         self.node_location_entry = vbox.add(uilib.TextEntry())
+        self.node_location_entry.set_text(self.get_suggested_new_node_path())
         vbox.add(
             uilib.Label("This location will contain all the node's "+\
-            "stored data and such.")).set_alignment(0, 0.5)
+            "stored data and such.\nIt should be an empty or " +\
+            "new folder.")).set_alignment(0, 0.5)
 
         self.set_modal(True)
         vbox.show_all()
+
+    def get_filename(self):
+        return self.node_location_entry.get_text()
+
+    def get_suggested_new_node_path(self):
+        home_dir = os.path.expanduser("~")
+        number = 0
+        base_path = os.path.join(home_dir, "my_new_node")
+        path = base_path
+        while os.path.exists(path):
+            number += 1
+            path = base_path + "_" + str(number)
+        return path
 
     def run(self):
         result = super(CreateNodeDialog, self).run()

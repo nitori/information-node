@@ -196,7 +196,7 @@ class Button(Gtk.Button, WidgetMixin):
         super(Button, self).__init__(*args, **kwargs)
         self.connect("clicked", lambda button: self.trigger("click"))
 
-class ComboBox(Gtk.ComboBox, WidgetMixin):
+class ComboBoxText(Gtk.ComboBoxText, WidgetMixin):
     pass
 
 class TextEntry(Gtk.Entry, WidgetMixin):
