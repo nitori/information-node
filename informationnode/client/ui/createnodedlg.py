@@ -1,7 +1,7 @@
 
 '''
 information-node - an advanced tool for data synchronization
-Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+Copyright (C) 2015  Information Node Development Team (see AUTHORS.md)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,16 +23,27 @@ import informationnode.uilib as uilib
 import os
 import sys
 
-class CreateNodeWindow(uilib.Window):
-    def __init__(self):
-        super(CreateNodeWindow, self).__init__()
-        self.box.set_property("margin", 10)
-        self.add(uilib.Label("Specify the location for your new node:"),
-            padding=10).\
+class CreateNodeDialog(uilib.Dialog):
+    def __init__(self, parent=None):
+        super(CreateNodeDialog, self).__init__(title="Create New Node",
+            parent=parent,
+            buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_OK, Gtk.ResponseType.OK))
+        vbox = uilib.VBox()
+        self.vbox.pack_start(vbox, True, True, 0)
+
+        self.vbox.set_property("margin", 10)
+        vbox.add(uilib.Label("Specify the location for your new node:")).\
             set_alignment(0, 0.5)
-        self.node_location_entry = self.add(uilib.TextEntry())
-        self.add(uilib.Label("This location will contain all the node's "+\
+        self.node_location_entry = vbox.add(uilib.TextEntry())
+        vbox.add(
+            uilib.Label("This location will contain all the node's "+\
             "stored data and such.")).set_alignment(0, 0.5)
-        self.set_title("Create Node")
+
         self.set_modal(True)
+        vbox.show_all()
+
+    def run(self):
+        result = super(CreateNodeDialog, self).run()
+        return result
 

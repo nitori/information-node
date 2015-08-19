@@ -80,43 +80,81 @@ action_info_list = [
     Remove the connection from a remote node again. This will not remove any
     permissions.
     ''')),
-    ("allow-read", "<node-folder> <fingerprint> <item-mask>",
+    ("allow-read", "<node-folder> <fingerprint> <tag-list>",
     "allow read access for the specified node for the given item mask",
     textwrap.dedent('''\
     Allow the remote node with
     the given fingerprint to access all data in the local node located at
-    <node-folder> with read-only permission.
+    <node-folder> with read-only permission for items that are tagged with
+    at least one tag in <tag-list>.
+
+    A remote node can read an item as soon as it has read permission on
+    at least one tag an item is tagged with.
+
+    Note on encryption:
 
     [b]You can enforce that the target node only gets your data encrypted
     (so you can use it as a backup location that cannot actually access or
-    reveal the data)[/b] - see [b]allow-read --help[/b] for details on
+    reveal the data) with --force-encrypt[/b] -
+    see [b]allow-read --help[/b] for details on
     how to do that.
 
-    When another node has read access to items matching a given item
-    mask, and this node has write access to that other node, the items
+    Note on synchronization:
+
+    When another node has read access to items who have the given tags and
+    this node has write access to that other node, the items
     will automatically get synchronized if the nodes are connected
-    (see [b]link[/b]).''')),
-    ("disallow-read", "<node-folder> <item-mask> <fingerprint>",
-    "disallow read access for the specified node for the given item mask",
+    (see [b]link[/b]).
+
+    Note on the privacy of tags:
+
+    Please note tags are generally [b]not transmitted[/b] to the other node
+    for security and privacy reasons, but each node tags incoming items with
+    a special tag for the respective source, so you can set up permission
+    rules based on that for further routing.
+    ''')),
+    ("revoke-read", "<node-folder> <tag-list>",
+    "revoke read access for the specified node for the given tags",
     textwrap.dedent('''\
     Revokes read
-    access to
-    the local node located at <node-folder> for the remote node with the
-    given fingerprint.''')),
-    ("allow-write", "<node-folder> <item-mask> <fingerprint>",
-    "allow write access for the specified node for the given item mask",
+    access again as specified in [b]allow-read[/b].
+
+    If no tag-list is given, all read access for this node is revoked.''')),
+    ("allow-write-new", "<node-folder> <fingerprint>",
+    "allow write access for the specified node for new items",
     textwrap.dedent('''\
     Allow the
     remote node with
-    the given fingerprint to add data to the local node located at
-    <node-folder>. Please note this does NOT mean it can also access any
-    data - see "allow-read" to allow that.''')),
-    ("disallow-write", "<node-folder> <item-mask> <fingerprint>",
-    "disallow write access for the specified node for the given item mask",
+    the given fingerprint to add new data items to the local node located at
+    <node-folder>.
+
+    It doesn't imply the node can also overwrite/update existing items,
+    see [b]allow-access-update[/b] for that - unless the item was originally
+    transfered by this node itself and not yet modified by any other.
+
+    It also doesn't imply any sort of read access for this node, see
+    [b]allow-access-read[/b] for that.''')),
+    ("allow-write-modify", "<node-folder> <fingerprint> <tag-list>",
+    "allow write access for the specified node for modifying existing items",
+    textwrap.dedent('''\
+    Allow the remote node with the given fingerprint to modify existing
+    items matching any of the given tags.
+
+    It doesn't imply the node can also read them, see
+    [b]allow-access-read[/b] for that.''')),
+    ("revoke-write-new", "<node-folder> <fingerprint>",
+    "revoke write access for addition of new items",
     textwrap.dedent('''\
     Revokes write access to
     the local node located at <node-folder> for the remote node with the
-    given fingerprint.''')),
+    given fingerprint as previously specified in [b]allow-write-new[/b].''')),
+    ("revoke-write-modify", "<node-folder> <fingerprint> <tag-list>",
+    "revoke write access for modifying items with the given tags",
+    textwrap.dedent('''\
+    Revokes write access to
+    the local node located at <node-folder> for the remote node with the
+    given fingerprint
+    as previously specified in [b]allow-write-modify[/b].''')),
     ("enable-encrypt-password", "<node-folder> <item-mask> <password>",
     "enable encryption for all items matching the item mask",
     textwrap.dedent('''\

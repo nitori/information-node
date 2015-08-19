@@ -84,43 +84,29 @@ class Window(Gtk.Window, WidgetMixin):
     def show(self):
         self.show_all()
 
-class VBox(Gtk.VBox, WidgetMixin):
+class AddInsteadOfPackMixin(object):
+    def add(self, widget, expand=False, end=False, fill=None, padding=5):
+        if fill == None:
+            fill = expand
+        if not end:
+            if expand:
+                self.pack_start(widget, True, fill, padding=padding)
+            else:
+                self.pack_start(widget, False, fill, padding=padding)
+        else:
+            if expand:
+                self.pack_start(widget, True, fill, padding=padding)
+            else:
+                self.pack_start(widget, False, fill, padding=padding)
+        return widget
+
+class VBox(AddInsteadOfPackMixin, Gtk.VBox, WidgetMixin):
     def __init__(self, spacing=0):
         super(VBox, self).__init__(spacing=spacing)
 
-    def add(self, widget, expand=False, end=False, fill=None, padding=5):
-        if fill == None:
-            fill = expand
-        if not end:
-            if expand:
-                self.pack_start(widget, True, fill, padding=padding)
-            else:
-                self.pack_start(widget, False, fill, padding=padding)
-        else:
-            if expand:
-                self.pack_start(widget, True, fill, padding=padding)
-            else:
-                self.pack_start(widget, False, fill, padding=padding)
-        return widget
-
-class HBox(Gtk.HBox, WidgetMixin):
+class HBox(AddInsteadOfPackMixin, Gtk.HBox, WidgetMixin):
     def __init__(self, spacing=0):
         super(HBox, self).__init__(spacing=spacing)
-
-    def add(self, widget, expand=False, end=False, fill=None, padding=5):
-        if fill == None:
-            fill = expand
-        if not end:
-            if expand:
-                self.pack_start(widget, True, fill, padding=padding)
-            else:
-                self.pack_start(widget, False, fill, padding=padding)
-        else:
-            if expand:
-                self.pack_end(widget, True, fill, padding=padding)
-            else:
-                self.pack_end(widget, False, fill, padding=padding)
-        return widget
 
 class TextEntry(Gtk.Entry, WidgetMixin):
     def __init__(self, text=""):
@@ -210,8 +196,21 @@ class Button(Gtk.Button, WidgetMixin):
         super(Button, self).__init__(*args, **kwargs)
         self.connect("clicked", lambda button: self.trigger("click"))
 
+class ComboBox(Gtk.ComboBox, WidgetMixin):
+    pass
+
 class TextEntry(Gtk.Entry, WidgetMixin):
     pass
+
+class Dialog(Gtk.Dialog, WidgetMixin):
+    def __init__(self, *args, **kwargs):
+        super(Dialog, self).__init__(*args, **kwargs)
+        #print("class of action area: " + str(self.action_area.__class__))
+        #self.action_area.__class__ = type("ButtonBox",
+        #    (self.action_area.__class__, AddInsteadOfPackMixin),
+        #    {})
+        #print("new class: " + str(self.action_area.__class__))
+        #print(".add member: " + str(self.action_area.add))
 
 class AboutDialog(Gtk.AboutDialog, WidgetMixin):
     pass

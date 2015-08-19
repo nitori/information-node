@@ -158,7 +158,27 @@ if args.action == "raw-cmd":
                     break
                 except ValueError:
                     continue  # nope. continue parsing
-        logging.debug("Parsed obj: " + str(json_obj))
+    else:
+        # read the known input size:
+        input_data = sys.stdin.read(input_bytes)
+        json_obj = json.loads(input_data)
+    logging.debug("Parsed obj: " + str(json_obj))
+    logging.debug("Sending the request...")
+
+    # send over socket:
+    socket.send(json.dumps(json_obj))
+    
+    # get response:
+    response_bytes = ""
+    while True:
+        try:
+            response_bytes += socket.recv(512)
+        except OSError:
+            break
+
+    # print response:
+    print(response_bytes)
+    sys.exit(0)
 else:
     if args.action in action_info:
         print("Dear user,")

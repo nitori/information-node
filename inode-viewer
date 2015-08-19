@@ -18,10 +18,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+import argparse
 import os
 import platform
 import sys
 import textwrap
+
+parser = argparse.ArgumentParser(description=\
+    textwrap.dedent('''\
+    Graphical viewer to access information node data.
+    This tool is free software. "+\
+    "See LICENSE.txt for license and warranty information.
+    ''').strip().replace("\n", " ").replace("  ", " "))
+parser.add_argument("--debug-history",
+    default=False, action="store_true", dest="debug_history",
+    help="keep an in-memory history of recently issued commands " +\
+        "for debugging purposes (Viewer Activity Log)")
+args = parser.parse_args()
 
 # check whether gtk is present:
 gtk_available = True
@@ -121,26 +134,32 @@ if not pycrypto_available:
 
 from informationnode.uilib import uilib_main_loop, uilib_quit
 from informationnode.client.ui.nodewindow import NodeWindow
+from informationnode.client.api.nodeactions import NodeActions
 
 class App(object):
-    def __init__(self):
+    def __init__(self, keep_history=False):
         self.windows = []
+        self.actions = NodeActions(self, keep_history=keep_history)
 
     def window_close_event(self, win):
         self.windows.remove(win)
         if len(self.windows) == 0:
             uilib_quit()
 
+    def add_window(self, win):
+        win.register("close", self.window_close_event)
+        self.windows.append(win)
+        win.show()
+        return win
+
     def add_node_window(self, node_path):
-        new_window = NodeWindow(node_path)
-        new_window.register("close", self.window_close_event)
-        self.windows.append(new_window)
-        new_window.show()
-        return new_window
+        new_window = NodeWindow(self, node_path)
+        return self.add_window(new_window)
 
     def run(self):
         self.add_node_window(None)
         uilib_main_loop()
 
-app = App()
+app = App(keep_history=args.debug_history)
 app.run()
+

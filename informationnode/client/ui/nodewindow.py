@@ -1,7 +1,7 @@
 
 '''
 information-node - an advanced tool for data synchronization
-Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+Copyright (C) 2015  Information Node Development Team (see AUTHORS.md)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,13 +20,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from gi.repository import Gtk
 from informationnode.helper import check_if_node_dir, check_if_node_runs
 import informationnode.uilib as uilib
-from informationnode.client.ui.createnodewindow import CreateNodeWindow
+from informationnode.client.ui.createnodedlg import CreateNodeDialog
+from informationnode.client.ui.viewerlogwindow import ViewerLogWindow
 import os
 import sys
 
 class NodeWindow(uilib.Window):
-    def __init__(self, node_path):
+    def __init__(self, app, node_path):
         super().__init__()
+
+        self.app = app
 
         if node_path == None:
             self.set_title("Information Node Viewer")
@@ -48,8 +51,15 @@ class NodeWindow(uilib.Window):
         new_tab_contents = uilib.HBox()
         notebook.add(new_tab_contents, "Welcome")
 
+        # add first horizontal spacer
+        new_tab_contents.add(uilib.HBox(), end=False, expand=True, fill=True)
+ 
+        # add vbox into hbox, centered:
         new_tab_box = uilib.VBox(spacing=5)
         new_tab_contents.add(new_tab_box, expand=False)
+
+        # add first vertical spacer:
+        new_tab_box.add(uilib.VBox(), end=False, expand=True, fill=True)
 
         new_tab_box.add(uilib.Label("Welcome! Choose what to do:"))
         self.welcome_tab_recent_node = new_tab_box.add(
@@ -69,17 +79,20 @@ class NodeWindow(uilib.Window):
             uilib.RadioButton("Create a new node",
             group=self.welcome_tab_open_node_remote))
 
-        # add spacer:
-        new_tab_box.add(uilib.HBox(), end=True, expand=True, fill=False)
+        # add second horizontal spacer:
+        new_tab_contents.add(uilib.HBox(), end=False, expand=True, fill=True)
 
         # add button box:
         button_hbox = uilib.HBox()
-        new_tab_box.add(button_hbox, end=True)
+        new_tab_box.add(button_hbox, end=False)
 
         # add "Go!" button:
         do_it = uilib.Button("Go!")
         do_it.register("click", lambda button: self.welcometab_go())
-        button_hbox.add(do_it)
+        button_hbox.add(do_it, fill=True, expand=True)
+
+        # add second vertical sapcer:
+        new_tab_box.add(uilib.VBox(), end=False, expand=True, fill=True)
 
         return notebook
 
@@ -96,15 +109,19 @@ class NodeWindow(uilib.Window):
         print("TEST")        
 
     def nodemenu_create(self, widget):
-        create_win = CreateNodeWindow()
+        create_win = CreateNodeDialog()
         create_win.set_transient_for(self)
-        create_win.show()
+        result = create_win.run()
+        create_win.destroy()
 
     def nodemenu_close(self, widget):
         print("TEST")    
 
     def nodemenu_quit(self, widget):
         sys.exit(0)
+
+    def logmenu_viewerlog(self, widget):
+        self.app.add_window(ViewerLogWindow(self.app))
 
     def welcometab_go(self):
         if self.welcome_tab_open_node_disk.get_active():
@@ -190,7 +207,7 @@ class NodeWindow(uilib.Window):
             self.nodemenu_open)
         menu.nodemenu.add(menu.nodemenu.open)
         menu.nodemenu.open_remote = uilib.MenuItem(
-            "Connect To Remote Node...")
+            "Connect To _Remote Node...")
         menu.nodemenu.open_remote.register("click",
             self.nodemenu_open_remote)
         menu.nodemenu.add(menu.nodemenu.open_remote)
@@ -209,7 +226,24 @@ class NodeWindow(uilib.Window):
         menu.nodemenu.quit.register("click",
             self.nodemenu_quit)
         menu.nodemenu.add(menu.nodemenu.quit)
-        
+
+        # add log menu:
+        menu.logmenulabel = uilib.MenuItem("_Log")
+        menu.add(menu.logmenulabel)
+        menu.logmenu = uilib.Menu()
+        menu.logmenulabel.add(menu.logmenu)
+
+        # node log contents:
+        menu.logmenu.dataserver = uilib.MenuItem("Show Node _Data Server Log")
+        #menu.logmenu.dataserver.register("click",
+        #    self.nodemenu_open)
+        menu.logmenu.add(menu.logmenu.dataserver)
+        menu.logmenu.viewerlog = uilib.MenuItem(
+            "Show _Viewer Activity Log")
+        menu.logmenu.viewerlog.register("click",
+            self.logmenu_viewerlog)
+        menu.logmenu.add(menu.logmenu.viewerlog)
+ 
         # add about menu:        
         menu.aboutmenulabel = uilib.MenuItem("_About")
         menu.add(menu.aboutmenulabel)
