@@ -18,29 +18,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 from informationnode.client.api.nodeaction import NodeAction
+import os
 import subprocess
 
 class NodeActions(object):
     def __init__(self, app, keep_history=False):
         self.app = app
         self.history = dict()
+        self.keep_history = keep_history
 
     def are_tools_installed(self):
         try:
-            subprocess.check_output(["information-node", "--help"])
+            with open(os.devnull, 'w') as nullfile:
+                subprocess.check_output(["information-node", "--help"],
+                    stderr=nullfile)
             return True
         except subprocess.CalledProcessError:
             return False
 
     def do(self, node_url, json, tool="inode-viewer-cli",
-            cmd="raw-cmd", cmd_args=[],
+            cmd="raw-cmd", cmd_args=[], answer_is_json=False,
             reason="unspecified"):
         if not self.are_tools_installed():
             # travel up from informationnode.client.api
             tool = os.path.join(os.path.dirname(__file__),
                 "..", "..", "..", tool)
         action = NodeAction(node_url, json, tool=tool, cmd=cmd,
-            cmd_args=cmd_args)
+            cmd_args=cmd_args, answer_is_json=answer_is_json,
+            reason=reason)
         if self.keep_history:
             if not node_url in self.history:
                 self.history[node_url] = []

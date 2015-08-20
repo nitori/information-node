@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+from enum import Enum
 from gi.repository import Gtk
 from informationnode.helper import check_if_node_dir, check_if_node_runs
 import informationnode.uilib as uilib
@@ -24,6 +25,13 @@ from informationnode.client.ui.createnodedlg import CreateNodeDialog
 from informationnode.client.ui.viewerlogwindow import ViewerLogWindow
 import os
 import sys
+import time
+
+class NodeState(Enum):
+    UNKNOWN=0
+    DATA_SERVER_OFF=1
+    DATA_SERVER_ON=2
+    DATA_SERVER_UNREACHABLE=3
 
 class NodeWindow(uilib.Window):
     def __init__(self, app, node_path):
@@ -31,13 +39,97 @@ class NodeWindow(uilib.Window):
 
         self.app = app
 
+        self.node_state = NodeState.UNKNOWN
         self.node_path = node_path
         self.menu = self.build_menu()
         self.add(self.menu)
         self.notebook = self.build_notebook()
         self.add(self.notebook, expand=True)
 
-        self.set_node_opened(False)    
+        self.set_node_opened(False)
+
+        if self.node_path != None:
+            if self.node_state == NodeState.DATA_SERVER_OFF:
+                if uilib.Dialog.show_yesno(
+                        "This node's data server is not running. Launch it?",
+                        "Data server is off"):
+                    action = self.app.actions.do(
+                        fpath, "", tool="information-node",
+                        cmd="node", answer_is_json=False)
+                    (result, content) = action.run()
+                    if not result:
+                        uilib.Dialog.show_error(
+                            "Launching the data server failed: " +\
+                             str(content),
+                            "Failed to launch data server", parent=self)
+                        self.node_path = None
+                        self.node_state = NodeState.Unknown
+                        self.set_node_opened(False)
+            elif self.node_state == NodeState.DATA_SERVER_ON:
+                uilib.Dialog.show_error(
+                    "Cannot use this node, data server was " +\
+                    "detected in unknown state: " + str(self.node_state),
+                    "Data server in unknown state", parent=self)
+                self.node_path = None
+                self.node_state = NodeState.Unknown
+                self.set_node_opened(False)
+
+    def show_long_action_notice(self,
+            operation="This might take a moment..."):
+        if hasattr(self, "long_action_win") and \
+                self.long_action_win != None:
+            return
+        win = uilib.Window()
+        win.set_title("Please be patient...")
+        win.set_transient_for(self)
+
+        vbox = uilib.VBox()
+        win.add(vbox)
+        
+        vbox.add(uilib.Label(operation))
+
+        def no_delete(self, *args):
+            return True 
+
+        win.connect('delete_event', no_delete)
+        win.show_all()
+        
+        # make sure the window shows:
+        t = time.time()
+        while time.time() < t+1:
+            while Gtk.events_pending():
+                Gtk.main_iteration()
+
+        self.long_action_win = win
+
+    def hide_long_action_notice(self):
+        if not hasattr(self, "long_action_win") or \
+                not self.long_action_win != None:
+            return
+        self.long_action_win.destroy()
+
+    def check_node_data_server(self):
+        # check if there's a data server process:
+        (result, msg) = check_if_node_runs(self.node_path)
+        if result == None:
+            uilib.Dialog.show_error(
+                "Node has invalid state: " + str(msg),
+                "Error when checking node state",
+                parent=self)
+            self.node_path = None
+            return
+        if result != True:
+            self.node_state = NodeState.DATA_SERVER_OFF
+            return
+
+        # ping the data server:
+        action = self.app.actions.do(
+            self.node_path, "", cmd="ping")
+        (result, content) = action.run()
+        if not result:
+            self.node_state = NodeState.DATA_SERVER_UNREACHABLE
+        else:
+            self.node_state = NodeState.DATA_SERVER_ON
 
     def build_notebook(self):
         notebook = uilib.Notebook()
@@ -86,13 +178,19 @@ class NodeWindow(uilib.Window):
         do_it.register("click", lambda button: self.welcometab_go())
         button_hbox.add(do_it, fill=True, expand=True)
 
-        # add second vertical sapcer:
+        # add second vertical spacer:
         new_tab_box.add(uilib.VBox(), end=False, expand=True, fill=True)
 
         return notebook
 
     def set_node_opened(self, opened):
+        # check for detailed data server state if necessary:
         if opened:
+            if self.node_state == NodeState.UNKNOWN:
+                self.check_node_data_server()
+        
+        # adapt window/menus to reflect the state:
+        if opened and self.node_path != None:
             self.menu.nodemenu.close.enable()
             self.menu.logmenu.dataserver.enable()
             self.set_title("Node: " + self.node_path)
@@ -115,18 +213,17 @@ class NodeWindow(uilib.Window):
 
         # create new node if instructed to:
         if fpath != None:
+            self.show_long_action_notice(
+                "Creating a new information node...")
             action = self.app.actions.do(
                 fpath, "", tool="information-node",
-                cmd="node")
+                cmd="node", answer_is_json=False)
             (result, content) = action.run()
+            self.hide_long_action_notice()
             if not result:
-                dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
-                    Gtk.ButtonsType.OK,
-                    "Failed to create node")
-                dialog.format_secondary_text(
-                    "Failed to create node: " + str(content))
-                dialog.run()
-                dialog.destroy()
+                uilib.Dialog.show_error(
+                    "The node creation failed: " + str(content),
+                    "Failed to create node", parent=self)
             else:
                 if self.node_path == None:
                     # this window has no node opened, open it in here
@@ -269,7 +366,7 @@ class NodeWindow(uilib.Window):
         menu.logmenu = uilib.Menu()
         menu.logmenulabel.add(menu.logmenu)
 
-        # node log contents:
+        # log menu contents:
         menu.logmenu.dataserver = uilib.MenuItem("Show Node _Data Server Log")
         #menu.logmenu.dataserver.register("click",
         #    self.nodemenu_open)

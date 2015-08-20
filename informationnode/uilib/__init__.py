@@ -212,6 +212,30 @@ class Dialog(Gtk.Dialog, WidgetMixin):
         #print("new class: " + str(self.action_area.__class__))
         #print(".add member: " + str(self.action_area.add))
 
+    @staticmethod
+    def show_error(text, title="Error", parent=None):
+        print("TEXT: " + str(text))
+        print("TITLE: " + str(title))
+        dialog = Gtk.MessageDialog(parent, 0, Gtk.MessageType.ERROR,
+            Gtk.ButtonsType.OK, title)
+        dialog.format_secondary_text(text)
+        dialog.run()
+        dialog.destroy()
+
+    @staticmethod
+    def show_yesno(text, title="Error", parent=None):
+        print("TEXT: " + str(text))
+        print("TITLE: " + str(title))
+        dialog = Gtk.MessageDialog(parent, 0, Gtk.MessageType.ERROR,
+            buttons=(Gtk.STOCK_NO, Gtk.ResponseType.CANCEL,
+            Gtk.STOCK_YES, Gtk.ResponseType.OK))
+        dialog.format_secondary_text(text)
+        response = dialog.run()
+        dialog.destroy()
+        if response == Gtk.ResponseType.OK:
+            return True
+        return False
+
 class AboutDialog(Gtk.AboutDialog, WidgetMixin):
     pass
 

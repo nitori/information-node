@@ -17,15 +17,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+import json
 import subprocess
 
 class NodeAction(object):
     def __init__(self, node_path, json_request,
             tool="inode-viewer-cli", cmd="raw-cmd",
-            cmd_args=[]):
-        self.node_path = node_socket
+            cmd_args=[], answer_is_json=True, reason=None):
+        self.answer_is_json = answer_is_json
+        self.node_path = node_path
         self.tool = tool
+        self.reason = reason
         self.cmd = cmd
+        self.cmd_args = cmd_args
         self.json_request = json_request
         self._done = False
 
@@ -41,10 +45,16 @@ class NodeAction(object):
             input=self.json_request)
         self._done = True
         try:
-            json_obj = json.loads(stdout_data)
-        except ValueError:
-            return (False, stdout_data)
-        return (True, json_obj)
+            stdout_data = stdout_data.decode("utf-8", "ignore")
+        except AttributeError:
+            pass
+        if self.answer_is_json:
+            try:
+                json_obj = json.loads(stdout_data)
+            except ValueError:
+                return (False, stdout_data)
+            return (True, json_obj)
+        return (True, stdout_data)
 
     @property
     def done(self):
