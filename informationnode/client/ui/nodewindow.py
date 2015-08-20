@@ -47,14 +47,16 @@ class NodeWindow(uilib.Window):
         self.add(self.notebook, expand=True)
 
         self.set_node_opened(False)
+        self.offer_data_server_start()
 
+    def offer_data_server_start(self):
         if self.node_path != None:
             if self.node_state == NodeState.DATA_SERVER_OFF:
                 if uilib.Dialog.show_yesno(
                         "This node's data server is not running. Launch it?",
                         "Data server is off"):
                     action = self.app.actions.do(
-                        fpath, "", tool="information-node",
+                        self.node_path, "", tool="information-node",
                         cmd="node", answer_is_json=False)
                     (result, content) = action.run()
                     if not result:
@@ -63,15 +65,19 @@ class NodeWindow(uilib.Window):
                              str(content),
                             "Failed to launch data server", parent=self)
                         self.node_path = None
-                        self.node_state = NodeState.Unknown
+                        self.node_state = NodeState.UNKNOWN
                         self.set_node_opened(False)
+                else:
+                    self.node_path = None
+                    self.node_state = NodeState.UNKNOWN
+                    self.set_node_opened(False)
             elif self.node_state == NodeState.DATA_SERVER_ON:
                 uilib.Dialog.show_error(
                     "Cannot use this node, data server was " +\
                     "detected in unknown state: " + str(self.node_state),
                     "Data server in unknown state", parent=self)
                 self.node_path = None
-                self.node_state = NodeState.Unknown
+                self.node_state = NodeState.UNKNOWN
                 self.set_node_opened(False)
 
     def show_long_action_notice(self,
@@ -184,6 +190,10 @@ class NodeWindow(uilib.Window):
         return notebook
 
     def set_node_opened(self, opened):
+        """ Change this node window's entire state based on whether it has
+            currently a node opened or not.
+        """
+
         # check for detailed data server state if necessary:
         if opened:
             if self.node_state == NodeState.UNKNOWN:
@@ -229,6 +239,7 @@ class NodeWindow(uilib.Window):
                     # this window has no node opened, open it in here
                     self.node_path = fpath
                     self.set_node_opened(True)
+                    self.offer_data_server_start()
                 else:
                     # open it in a new window:
                     new_win = NodeWindow(self.app, fpath)
@@ -280,6 +291,7 @@ class NodeWindow(uilib.Window):
                 # this window has no node opened, open it in here
                 self.node_path = directory
                 self.set_node_opened(True)
+                self.offer_data_server_start()
             else:
                 # open it in a new window:
                 new_win = NodeWindow(self.app, directory)
