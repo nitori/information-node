@@ -1,7 +1,7 @@
 
 '''
 information-node - an advanced tool for data synchronization
-Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+Copyright (C) 2015  Information Node Development Team (see AUTHORS.md)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,57 +24,61 @@ import os
 import platform
 import queue
 import signal
+import struct
 import threading
 import time
 
+from informationnode.helper import send_json, recv_json
+
 class FileSocketApiClientHandler(threading.Thread):
     def __init__(self, client):
-        self.daemon = daemon
+        super().__init__()
+        self.daemon = client.daemon
         self.client = client
         self.socket = client.socket
-        self.internal_api_queue = daemon.internal_api_queue
+        self.internal_api_queue = self.daemon.internal_api_queue
 
     def process_msg(self, msg):
         """ Process an API msg that was received. """
-        logging.debug("received msg from: " + str(self.client.addr))
+        logging.debug("received msg from: " + str(self.client.address))
         logging.debug("msg contents: " + str(msg))
 
     def run(self):
         try:
             recv_buf = b""
             while True:
-                # get message size:
-                msg_size = ""
-                while len(msg_size) < 4:
-                    msg_size += self.socket.recv(4 - len(msg_size))
-                msg_size = struct.unpack("!i", msg_size)
-
-                # get message:
-                msg = ""
-                while len(msg) < msg_size:
-                    msg += self.socket.recv(msg_size - len(msg))
-                
-                # process message:
-                try:
-                    msg = json.loads(msg)
-                    self.process_msg(msg)
-                except ValueError:
-                    self.socket.close()
+                # get message from client:
+                msg = recv_json(self.socket)
+                if msg == None:
+                    # nothing received / connection lost.
+                    self.socket_close()
                     self.client.socket = None
                     return
+
+                # process received message:
+                self.process_msg(msg)
+
         except Exception as e:
-            logging.error("Error in FileSocketApiClientHandler.run: " +\
+            logging.exception("Error in FileSocketApiClientHandler.run: " +\
                 str(e))
             self.socket.close()
             self.client.socket = None
 
 class FileSocketApiClient(object):
     def __init__(self, daemon, socket, address):
+        self.daemon = daemon
         self.address = address
         self.socket = socket
-        self.client_thread = FileSocketApiClientHandler(daemon, socket)
+        self.client_thread = FileSocketApiClientHandler(self)
         self.client_thread.start()
-    
+
+    def force_terminate(self):
+        try:
+            self.socket.close()
+        except (OSError, AttributeError):
+            pass
+        self.socket = None
+ 
     def terminated(self):
         if self.socket == None:
             return True
@@ -84,7 +88,8 @@ class Daemon(object):
     def __init__(self, node_path):
         self.node_path = node_path
         self.api_processor_terminated = False
-        self.terminate = False
+        self.api_socket_processor_terminated = False
+        self._terminate = False
 
         # set up signal handlers:
         if platform.system().lower() != "windows":
@@ -103,10 +108,26 @@ class Daemon(object):
             level=logging.DEBUG)
         logging.info("Data server initialized.")
 
+    def terminate(self):
+        """ Set the shutdown signal on the daemon and terminate various things
+            like the api socket.
+        """
+
+        # remove api socket:
+        try:
+            self.api_socket.close()
+        except OSError:
+            pass
+        if platform.system().lower() != "windows":
+            os.remove(os.path.join(self.node_path, "api_access.sock"))
+
+        self._terminate = True
+        logging.info("Shutdown initiated...")
+
     def sigterm_handler(self, signal, unused_info):
         """ SIGTERM handler which will initiate shutdown. """
         logging.debug("sigterm received")
-        self.terminate = True
+        self.terminate()
 
     def sighup_handler(self, signal, unused_info):
         """ SIGHUP handler. Usually this is used for asking a daemon to reload
@@ -120,9 +141,7 @@ class Daemon(object):
             work on disk.
         """
         try:
-            while not self.terminate:
-                print("internal_api_processor. self.terminate: " + str(\
-                    self.terminate))
+            while not self._terminate:
                 try:
                     next_msg = self.internal_api_queue.get(timeout=0.5)
                 except queue.Empty:
@@ -144,14 +163,24 @@ class Daemon(object):
             (api_access.sock). Hands off the actual work to the internal api
             processor later by forming the according internal JSON requests.
         """
+        logging.debug("[api_socket_processor] starting...")
         try:
             self.api_socket.listen(1)
+            logging.debug("[api_socket_processor] now listening")
             clients = {}
             while True:
                 # add new client(s):
                 c, addr = self.api_socket.accept()
-                clients[c] = FileSocketApiclient(c, addr)
-                
+                if self._terminate:
+                    logging.debug("[api_socket_processor] shutting down...")
+                    for client_k in clients:
+                        if not clients[client_k].terminated():
+                            clients[client_k].force_terminate()
+                    break
+
+                clients[c] = FileSocketApiClient(self, c, addr)
+                logging.debug("[api_socket_processor] new client")          
+
                 # throw away clients that have been terminated:
                 remove_clients = []
                 for client_k in clients:
@@ -159,6 +188,7 @@ class Daemon(object):
                         remove_clients.append(client_k)
                 for client_k in remove_clients:
                     del(clients[client_k])
+            self.api_socket_processor_terminated = True
         except Exception as e:
             logging.exception("unhandled exception in api_socket_processor")
 
@@ -180,12 +210,14 @@ class Daemon(object):
         self.api_thread.start()
 
         logging.debug("Data server main thread starting.")
+        
         # process continuous timed actions:
-        while not self.terminate or not self.api_processor_terminated:
-            logging.debug("self.terminate: " + str(self.terminate))
-            logging.debug("self.api_processor_terminated: " + str(\
-                self.api_processor_terminated))
+        while not self._terminate or not self.api_processor_terminated:
             time.sleep(1)
         logging.info("Shutting down data server.")
+        
+        # remove PID file:
+        os.remove(os.path.join(self.node_path, "pidfile"))
+
         os._exit(0)
 

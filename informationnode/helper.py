@@ -18,10 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 import argparse
+import json
 import os
 import platform
 import re
 import socket
+import struct
 import sys
 import textwrap
 
@@ -186,7 +188,51 @@ def get_api_socket_for_node(node_folder):
         
     else: 
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(5.0)
         s.connect(os.path.join(node_folder, "api_access.sock"))
 
     s.settimeout(5.0)
-    return (True, s) 
+    return (True, s)
+
+def send_json(socket, json_obj):
+    s = json.dumps(json_obj).encode("utf-8", "ignore")
+    length_bytes = struct.pack("!i", len(s))
+    socket.send(length_bytes)
+    socket.send(s)
+    
+def recv_json(socket, max_size=(1024 * 20)):
+    # get message size:
+    msg_size = b""
+    while len(msg_size) < 4:
+        try:
+            new_data = socket.recv(4 - len(msg_size))
+        except socket.timeout:
+            return None
+        if len(new_data) == 0:
+            return None
+        msg_size += new_data
+    assert(len(msg_size) == 4)
+    msg_size = struct.unpack("!i", msg_size)
+    assert(len(msg_size) == 1)
+    msg_size = msg_size[0]
+    if max_size > 0 and len(msg_size) > max_size:
+        return None
+
+    # get message:
+    msg = b""
+    while len(msg) < msg_size:
+        try:
+            new_data = socket.recv(msg_size - len(msg))
+        except socket.timeout:
+            return None
+        if len(new_data) == 0:
+            return None
+        msg += new_data
+    assert(len(msg) == msg_size)
+
+    # process message:
+    try:
+        return json.loads(msg.decode("utf-8", "ignore"))
+    except ValueError:
+        return None
+

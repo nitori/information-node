@@ -46,10 +46,10 @@ class NodeWindow(uilib.Window):
         self.notebook = self.build_notebook()
         self.add(self.notebook, expand=True)
 
-        self.set_node_opened(False)
-        self.offer_data_server_start()
+        self.detect_node_state()
+        self.node_state_popup()
 
-    def offer_data_server_start(self):
+    def node_state_popup(self):
         if self.node_path != None:
             if self.node_state == NodeState.DATA_SERVER_OFF:
                 if uilib.Dialog.show_yesno(
@@ -66,19 +66,31 @@ class NodeWindow(uilib.Window):
                             "Failed to launch data server", parent=self)
                         self.node_path = None
                         self.node_state = NodeState.UNKNOWN
-                        self.set_node_opened(False)
+                        self.detect_node_state()
+                        return
+                    self.node_state = NodeState.UNKNOWN
+                    self.detect_node_state()
+                    self.node_state_popup()
                 else:
                     self.node_path = None
                     self.node_state = NodeState.UNKNOWN
-                    self.set_node_opened(False)
-            elif self.node_state == NodeState.DATA_SERVER_ON:
+                    self.detect_node_state()
+            elif self.node_state == NodeState.DATA_SERVER_UNREACHABLE:
+                uilib.Dialog.show_error( # FIXME TEXT
+                    "Cannot use this node, data server is unreachable. " +\
+                    "Try terminating and restarting the data server.",
+                    parent=self)
+                self.node_path = None
+                self.node_state = NodeState.UNKNOWN
+                self.detect_node_state()
+            elif self.node_state != NodeState.DATA_SERVER_ON:
                 uilib.Dialog.show_error(
                     "Cannot use this node, data server was " +\
                     "detected in unknown state: " + str(self.node_state),
                     "Data server in unknown state", parent=self)
                 self.node_path = None
                 self.node_state = NodeState.UNKNOWN
-                self.set_node_opened(False)
+                self.detect_node_state()
 
     def show_long_action_notice(self,
             operation="This might take a moment..."):
@@ -189,10 +201,11 @@ class NodeWindow(uilib.Window):
 
         return notebook
 
-    def set_node_opened(self, opened):
+    def detect_node_state(self):
         """ Change this node window's entire state based on whether it has
-            currently a node opened or not.
+            currently a node opened or not, and detect the detailed state.
         """
+        opened = (self.node_path != None)
 
         # check for detailed data server state if necessary:
         if opened:
@@ -238,8 +251,8 @@ class NodeWindow(uilib.Window):
                 if self.node_path == None:
                     # this window has no node opened, open it in here
                     self.node_path = fpath
-                    self.set_node_opened(True)
-                    self.offer_data_server_start()
+                    self.detect_node_state()
+                    self.node_state_popup()
                 else:
                     # open it in a new window:
                     new_win = NodeWindow(self.app, fpath)
@@ -249,7 +262,7 @@ class NodeWindow(uilib.Window):
         if self.node_path == None:
             return
         self.node_path = None
-        self.set_node_opened(False)    
+        self.detect_node_state()    
 
     def nodemenu_quit(self, widget):
         sys.exit(0)
@@ -272,7 +285,6 @@ class NodeWindow(uilib.Window):
         if response == Gtk.ResponseType.OK:
             directory = dlg.get_filename()
             dlg.destroy()
-            print("SHOW OPEN DIALOG: " + str(directory))
 
             # see if this is a valid node:
             (result, msg) = check_if_node_dir(directory)
@@ -290,8 +302,8 @@ class NodeWindow(uilib.Window):
             if self.node_path == None:
                 # this window has no node opened, open it in here
                 self.node_path = directory
-                self.set_node_opened(True)
-                self.offer_data_server_start()
+                self.detect_node_state()
+                self.node_state_popup()
             else:
                 # open it in a new window:
                 new_win = NodeWindow(self.app, directory)

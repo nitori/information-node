@@ -33,21 +33,43 @@ class NodeAction(object):
         self.json_request = json_request
         self._done = False
 
+    def __repr__(self):
+        return "NodeAction(\"" + str(self.node_path) + "\", " +\
+            "\"" + self.json_request + "\", tool=\"" + self.tool + \
+            "\", cmd=\"" + self.cmd + "\")"
+
     def run(self):
         """ Returns (True, json_obj) on success, and
             (False, error_msg) on failure.
         """
+        print("Running action " + str(self))
         program = subprocess.Popen([self.tool] + \
             [self.cmd] + [self.node_path] + self.cmd_args,
             stdout=subprocess.PIPE,
             stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout_data, stderr_data) = program.communicate(
             input=self.json_request)
-        self._done = True
+        self._done = True        
+
+        # check return code:
+        exit_code = program.poll()
+        if exit_code != 0:
+            # convert stderr from bytes to string if necessary:
+            try:
+                stderr_data = stderr_data.decode("utf-8", "ignore")
+            except AttributeError:
+                pass
+            return (False, "the process returned non-zero exit code " +\
+                str(exit_code) + " with the following stderr output: " +\
+                stderr_data)
+
+        # convert result from bytes to string if necessary:
         try:
             stdout_data = stdout_data.decode("utf-8", "ignore")
         except AttributeError:
             pass
+
+        # convert response to JSON:
         if self.answer_is_json:
             try:
                 json_obj = json.loads(stdout_data)

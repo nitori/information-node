@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import argparse
 from informationnode.helper import check_if_node_dir, check_if_node_runs
 from informationnode.helper import get_api_socket_for_node
+from informationnode.helper import recv_json, send_json
 from informationnode.helper import DoubleLineBreakFormatter
 import json
 import logging
@@ -87,19 +88,6 @@ parser.add_argument("argument", nargs="*",
 if len(" ".join(sys.argv[1:]).strip()) == 0:
     parser.print_usage()
     sys.exit(1)
-
-# helper function to read response from socket
-def get_socket_response(socket):
-    response_bytes = ""
-    while True:
-        try:
-            response_bytes += socket.recv(512)
-        except OSError:
-            break
-    try:
-        return json.loads(response_bytes)
-    except ValueError:
-        return None
 
 # extract all arguments not meant for a subcommand:
 main_args = []
@@ -186,10 +174,12 @@ if args.action == "raw-cmd":
     logging.debug("Sending the request...")
 
     # send over socket:
-    socket.send(json.dumps(json_obj))
+    
+    socket.send(json.dumps(json_obj).encode("utf-8", "ignore"))
     
     # get response:
-    response_obj = get_socket_response()
+    response_obj = recv_json(socket)
+    socket.close()
 
     # print response:
     print(json.dumps(response_obj))
@@ -212,8 +202,9 @@ elif args.action == "ping":
         sys.exit(1)
 
     # ping the daemon:
-    socket.send(json.dumps({"action":"ping"}))
-    response = get_socket_response()
+    send_json(socket, {"action" : "ping"})
+    response = recv_json(socket)
+    socket.close()
     if response["action"] == "pong":
         print("Pong received.")
         sys.exit(0)
