@@ -81,6 +81,9 @@ class Window(Gtk.Window, WidgetMixin):
             self.box.pack_start(widget, False, False, padding)
         return widget
 
+    def remove(self, widget):
+        self.box.remove(widget)
+
     def show(self):
         self.show_all()
 

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 import argparse
+import logging
 import os
 import platform
 import sys
@@ -34,7 +35,15 @@ parser.add_argument("--debug-history",
     default=False, action="store_true", dest="debug_history",
     help="keep an in-memory history of recently issued commands " +\
         "for debugging purposes (Viewer Activity Log)")
+parser.add_argument("-v", "--verbose",
+    default=False, action="store_true", dest="verbose",
+    help="print out more verbose debugging output of activities")
 args = parser.parse_args()
+
+if args.verbose:
+    logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.WARNING)
 
 # check whether gtk is present:
 gtk_available = True

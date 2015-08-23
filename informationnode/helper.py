@@ -194,18 +194,25 @@ def get_api_socket_for_node(node_folder):
     s.settimeout(5.0)
     return (True, s)
 
-def send_json(socket, json_obj):
-    s = json.dumps(json_obj).encode("utf-8", "ignore")
-    length_bytes = struct.pack("!i", len(s))
-    socket.send(length_bytes)
-    socket.send(s)
-    
-def recv_json(socket, max_size=(1024 * 20)):
+def send_json(sock, json_obj):
+    data = json.dumps(json_obj).encode("utf-8", "ignore")
+    length_bytes = struct.pack("!i", len(data))
+    try:
+        sock.send(length_bytes)
+    except socket.timeout:
+        return False
+    try:
+        sock.send(data)
+    except socket.timeout:
+        return False
+    return True
+
+def recv_json(sock, max_size=(1024 * 20)):
     # get message size:
     msg_size = b""
     while len(msg_size) < 4:
         try:
-            new_data = socket.recv(4 - len(msg_size))
+            new_data = sock.recv(4 - len(msg_size))
         except socket.timeout:
             return None
         if len(new_data) == 0:
@@ -215,14 +222,14 @@ def recv_json(socket, max_size=(1024 * 20)):
     msg_size = struct.unpack("!i", msg_size)
     assert(len(msg_size) == 1)
     msg_size = msg_size[0]
-    if max_size > 0 and len(msg_size) > max_size:
+    if max_size > 0 and msg_size > max_size:
         return None
 
     # get message:
     msg = b""
     while len(msg) < msg_size:
         try:
-            new_data = socket.recv(msg_size - len(msg))
+            new_data = sock.recv(msg_size - len(msg))
         except socket.timeout:
             return None
         if len(new_data) == 0:

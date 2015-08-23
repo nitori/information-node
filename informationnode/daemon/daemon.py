@@ -42,6 +42,38 @@ class FileSocketApiClientHandler(threading.Thread):
         """ Process an API msg that was received. """
         logging.debug("received msg from: " + str(self.client.address))
         logging.debug("msg contents: " + str(msg))
+        if not "action" in msg:
+            # whoops this is invalid.
+            return False
+        if msg["action"] == "ping":
+            return self.respond({"action":"pong"})
+        elif msg["action"] == "shutdown":
+            result = self.respond({"action" : "response",
+                "responded_action" : msg["action"],
+                "response_type" : "success"})
+            self.daemon.terminate()
+            return result
+        else:
+            # unknown action.
+            return self.respond({"action" : "response",
+                "responded_action" : str(msg["action"]),
+                "response_type" : "error",
+                "error_info" : "unknown action: \"" +\
+                str(msg["action"]) + "\""})
+
+    def respond(self, obj):
+        # check the connection still being open:
+        if self.client.socket == None:
+            # client was already closed.
+            return False
+        # try to send:
+        if not send_json(self.socket, obj):
+            # sending failed
+            self.socket.close()
+            self.client.socket = None
+            return False
+
+        return True
 
     def run(self):
         try:
@@ -51,13 +83,23 @@ class FileSocketApiClientHandler(threading.Thread):
                 msg = recv_json(self.socket)
                 if msg == None:
                     # nothing received / connection lost.
-                    self.socket_close()
+                    self.socket.close()
                     self.client.socket = None
                     return
 
                 # process received message:
-                self.process_msg(msg)
-
+                try:
+                    if not self.process_msg(msg):
+                        # client was terminated.
+                        self.socket.close()
+                        self.client.socket = None
+                except Exception as e:
+                    logging.exception("Error in " +\
+                        "FileSocketApiClientHandler.process_msg: " +\
+                            str(e))
+                    self.socket.close()
+                    self.client.socket = None
+                    return
         except Exception as e:
             logging.exception("Error in FileSocketApiClientHandler.run: " +\
                 str(e))

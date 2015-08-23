@@ -23,9 +23,12 @@ from informationnode.helper import check_if_node_dir, check_if_node_runs
 import informationnode.uilib as uilib
 from informationnode.client.ui.createnodedlg import CreateNodeDialog
 from informationnode.client.ui.viewerlogwindow import ViewerLogWindow
+import logging
 import os
 import sys
 import time
+
+logging.basicConfig(level=logging.DEBUG)
 
 class NodeState(Enum):
     UNKNOWN=0
@@ -43,8 +46,8 @@ class NodeWindow(uilib.Window):
         self.node_path = node_path
         self.menu = self.build_menu()
         self.add(self.menu)
-        self.notebook = self.build_notebook()
-        self.add(self.notebook, expand=True)
+        
+        self.build_notebook()
 
         self.detect_node_state()
         self.node_state_popup()
@@ -150,42 +153,113 @@ class NodeWindow(uilib.Window):
             self.node_state = NodeState.DATA_SERVER_ON
 
     def build_notebook(self):
+        if self.node_path == None:
+            self.notebook = self.build_welcome_notebook()
+        else:
+            self.notebook = self.build_node_notebook()
+        self.add(self.notebook, expand=True)
+        self.notebook.show_all()
+
+    def rebuild_notebook(self):
+        self.destroy_notebook()
+        assert(not hasattr(self, "notebook"))
+        self.build_notebook()
+
+    def destroy_notebook(self):
+        if not hasattr(self, "notebook"):
+            # nothing to do
+            return
+
+        # helper function to get rid of widgets stored as members:
+        def destroy_widgets_which_are_members(widget):
+            for attr in dir(widget):
+                if attr.startswith("__"):
+                    continue
+                try:
+                    member = getattr(widget, attr)
+                except RuntimeError:
+                    continue
+                if hasattr(member, "destroy"):
+                    try:
+                        member.destroy()
+                    except Exception as e:
+                        pass
+
+        logging.debug("[nodewindow] Destroying notebook widget")
+        self.remove(self.notebook)
+        if hasattr(self, "welcome_tab"):
+            destroy_widgets_which_are_members(self.welcome_tab)
+            self.welcome_tab.destroy()
+            del(self.welcome_tab)
+        elif hasattr(self, "conversations_tab"):
+            def destroy_tab(name):
+                tab = getattr(self, name)
+                destroy_widgets_which_are_members(tab)
+                tab.destroy()
+                delattr(self, name)
+                assert(not hasattr(self, name))
+            destroy_tab("conversations_tab")
+            destroy_tab("files_tab")
+            destroy_tab("gateways_tab")
+        self.notebook.destroy()
+        del(self.notebook)
+
+    def build_node_notebook(self):
+        logging.debug("[nodewindow] Building node notebook contents")
+        notebook = uilib.Notebook()       
+
+        # add "Conversations" tab:
+        self.conversations_tab = uilib.HBox()
+        notebook.add(self.conversations_tab, "Conversations")
+
+        # add "Files" tab:
+        self.files_tab = uilib.HBox()
+        notebook.add(self.files_tab, "Files")
+
+        # add "Gateways" tab:
+        self.gateways_tab = uilib.HBox()
+        notebook.add(self.gateways_tab, "Gateways")
+
+        return notebook
+
+    def build_welcome_notebook(self):
+        logging.debug("[nodewindow] Building welcome notebook contents")
         notebook = uilib.Notebook()
         
-        # add tab:
-        new_tab_contents = uilib.HBox()
-        notebook.add(new_tab_contents, "Welcome")
+        # add "welcome" tab:
+        self.welcome_tab = uilib.HBox()
+        notebook.add(self.welcome_tab, "Welcome")
 
         # add first horizontal spacer
-        new_tab_contents.add(uilib.HBox(), end=False, expand=True, fill=True)
+        self.welcome_tab.add(uilib.HBox(), end=False, expand=True, fill=True)
  
         # add vbox into hbox, centered:
         new_tab_box = uilib.VBox(spacing=5)
-        new_tab_contents.add(new_tab_box, expand=False)
+        self.welcome_tab.add(new_tab_box, expand=False)
 
         # add first vertical spacer:
         new_tab_box.add(uilib.VBox(), end=False, expand=True, fill=True)
 
         new_tab_box.add(uilib.Label("Welcome! Choose what to do:"))
-        self.welcome_tab_recent_node = new_tab_box.add(
+        self.welcome_tab.recent_node = new_tab_box.add(
             uilib.RadioButton(
             "Open recently opened node:"))
-        self.welcome_tab_recent_node.disable()
-        self.welcome_tab_open_node_disk = new_tab_box.add(
+        self.welcome_tab.recent_node.disable()
+        self.welcome_tab.open_node_disk = new_tab_box.add(
             uilib.RadioButton(
             "Open local node...",
-            group=self.welcome_tab_recent_node))
-        self.welcome_tab_open_node_disk.set_active(True)
-        self.welcome_tab_open_node_remote = new_tab_box.add(
-            uilib.RadioButton(
-            "Open remote node...",
-            group=self.welcome_tab_open_node_disk))
-        self.welcome_tab_create_node = new_tab_box.add(
+            group=self.welcome_tab.recent_node))
+        self.welcome_tab.open_node_disk.set_active(True)
+        #self.welcome_tab.open_node_remote = new_tab_box.add(
+        #    uilib.RadioButton(
+        #    "Open remote node...",
+        #    group=self.welcome_tab.open_node_disk))
+        self.welcome_tab.create_node = new_tab_box.add(
             uilib.RadioButton("Create a new node",
-            group=self.welcome_tab_open_node_remote))
+            group=self.welcome_tab.open_node_disk))
 
         # add second horizontal spacer:
-        new_tab_contents.add(uilib.HBox(), end=False, expand=True, fill=True)
+        self.welcome_tab.add(uilib.HBox(), end=False, expand=True, fill=True)
 
         # add button box:
         button_hbox = uilib.HBox()
@@ -221,6 +295,7 @@ class NodeWindow(uilib.Window):
             self.menu.nodemenu.close.disable()
             self.menu.logmenu.dataserver.disable()
             self.set_title("Information Node Viewer")
+        self.rebuild_notebook()
 
     def nodemenu_open_remote(self, widget):
         print("TEST")        
@@ -271,9 +346,9 @@ class NodeWindow(uilib.Window):
         self.app.add_window(ViewerLogWindow(self.app))
 
     def welcometab_go(self):
-        if self.welcome_tab_open_node_disk.get_active():
+        if self.welcome_tab.open_node_disk.get_active():
             self.nodemenu_open(None)
-        elif self.welcome_tab_create_node.get_active():
+        elif self.welcome_tab.create_node.get_active():
             self.nodemenu_create(None)
 
     def nodemenu_open(self, widget):
@@ -363,11 +438,11 @@ class NodeWindow(uilib.Window):
         menu.nodemenu.open.register("click",
             self.nodemenu_open)
         menu.nodemenu.add(menu.nodemenu.open)
-        menu.nodemenu.open_remote = uilib.MenuItem(
-            "Connect To _Remote Node...")
-        menu.nodemenu.open_remote.register("click",
-            self.nodemenu_open_remote)
-        menu.nodemenu.add(menu.nodemenu.open_remote)
+        #menu.nodemenu.open_remote = uilib.MenuItem(
+        #    "Connect To _Remote Node...")
+        #menu.nodemenu.open_remote.register("click",
+        #    self.nodemenu_open_remote)
+        #menu.nodemenu.add(menu.nodemenu.open_remote)
         menu.nodemenu.add(uilib.SeparatorMenuItem())
         menu.nodemenu.create = uilib.MenuItem("Create _New Node...")
         menu.nodemenu.create.register("click",

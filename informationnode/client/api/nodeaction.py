@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 import json
+import logging
 import subprocess
 
 class NodeAction(object):
@@ -42,7 +43,7 @@ class NodeAction(object):
         """ Returns (True, json_obj) on success, and
             (False, error_msg) on failure.
         """
-        print("Running action " + str(self))
+        logging.debug("Running action " + str(self))
         program = subprocess.Popen([self.tool] + \
             [self.cmd] + [self.node_path] + self.cmd_args,
             stdout=subprocess.PIPE,
