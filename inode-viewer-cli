@@ -90,7 +90,7 @@ def get_action_overall_help_text():
 
 parser.add_argument("action",
     help=get_action_overall_help_text())
-parser.add_argument("--json", default=False,
+parser.add_argument("--json", default=False, dest="json",
     action="store_true",
     help="return the output formatted as JSON instead of plain " +\
         "human readable text as most commands do per default")
@@ -112,6 +112,7 @@ for arg in sys.argv[1:]:
         break
     main_args.append(arg)
 args = parser.parse_args(main_args)
+main_args = args
 
 if args.action == "raw-cmd":
     subparser = argparse.ArgumentParser(prog=\
@@ -143,7 +144,12 @@ if args.action == "raw-cmd":
     (result, socket) = get_api_socket_for_node(args.node_folder)
     if not result:
         # whoops, didn't work.
-        print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        if not main_args.json:
+            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        else:
+            print('{"action" : "client_error, "error_info" : '+\
+                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
+                 + '"}')
         sys.exit(1)
     
     # read JSON input from command line:
@@ -154,7 +160,7 @@ if args.action == "raw-cmd":
         if platform.system().lower() == "windows":
             print("inode-viewer-cli: error: raw-cmd without specified "+\
                 "input byte length not supported on windows. " +\
-                "Use --bytes")
+                "Use --bytes", file=sys.stderr)
             sys.exit(1)
         input_selector = selectors.DefaultSelector()
         input_selector.register(sys.stdin, EVENT_READ)
@@ -183,12 +189,9 @@ if args.action == "raw-cmd":
         # read the known input size:
         input_data = sys.stdin.read(input_bytes)
         json_obj = json.loads(input_data)
-    logging.debug("Parsed obj: " + str(json_obj))
-    logging.debug("Sending the request...")
 
     # send over socket:
-    
-    socket.send(json.dumps(json_obj).encode("utf-8", "ignore"))
+    send_json(socket, json_obj) 
     
     # get response:
     response_obj = recv_json(socket)
@@ -211,7 +214,12 @@ elif args.action == "ping":
     (result, socket) = get_api_socket_for_node(args.node_folder)
     if not result:
         # whoops, didn't work.
-        print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        if not main_args.json:
+            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        else:
+            print('{"action" : "client_error, "error_info" : '+\
+                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
+                 + '"}')
         sys.exit(1)
 
     # ping the daemon:
@@ -219,9 +227,16 @@ elif args.action == "ping":
     response = recv_json(socket)
     socket.close()
     if response["action"] == "pong":
-        print("Pong received.")
+        if not main_args.json:
+            print("Pong received.")
+        else:
+            print(response)
         sys.exit(0)
-    print("Invalid response.")
+    if not main_args.json:
+        print("inode-viewer-cli: error: invalid response.", file=sys.stderr)
+    else:
+        print('{"action" : "client_error, "error_info" : '+\
+            '"Invalid response received."}')
     sys.exit(1)
 elif args.action == "shutdown":
     subparser = argparse.ArgumentParser(prog=\
@@ -239,13 +254,20 @@ elif args.action == "shutdown":
         (result, msg) = check_if_node_runs(args.node_folder)
         if result == False:
             # it is, nothing to do.
+            if main_args.json:
+                print("{}")
             sys.exit(0)
 
     # get api socket for the node:
     (result, socket) = get_api_socket_for_node(args.node_folder)
     if not result:
         # whoops, didn't work.
-        print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        if not main_args.json:
+            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        else:
+            print('{"action" : "client_error, "error_info" : '+\
+                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
+                 + '"}')
         sys.exit(1)
 
     # send shutdown signal:
@@ -260,9 +282,13 @@ elif args.action == "shutdown":
     # safe to launch a new data server instance at this point):
     time.sleep(0.5)
 
+    print("{}")
     sys.exit(0)
 else:
     if args.action in action_info:
+        if main_args.json:
+            print('{"action" : "client_error, "error_info" : '+\
+                '"action not yet implemented: ' + args.action + '"}')
         print("Dear user,")
         print("")
         print("This software is still \033[1mwork in progress\033[21m.\n"+\
