@@ -234,9 +234,9 @@ elif args.action == "shutdown":
     setattr(args, "node_folder", getattr(args, "node-folder"))
 
     # check whether the node is already shutdown:
-    (result, msg) = check_if_node_dir(node_folder)
+    (result, msg) = check_if_node_dir(args.node_folder)
     if result == True:
-        (result, msg) = check_if_node_runs(node_folder)
+        (result, msg) = check_if_node_runs(args.node_folder)
         if result == False:
             # it is, nothing to do.
             sys.exit(0)

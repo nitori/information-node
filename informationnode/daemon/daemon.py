@@ -78,7 +78,7 @@ class FileSocketApiClientHandler(threading.Thread):
     def run(self):
         try:
             recv_buf = b""
-            while True:
+            while self.client.socket != None:
                 # get message from client:
                 msg = recv_json(self.socket)
                 if msg == None:
@@ -93,6 +93,7 @@ class FileSocketApiClientHandler(threading.Thread):
                         # client was terminated.
                         self.socket.close()
                         self.client.socket = None
+                        return
                 except Exception as e:
                     logging.exception("Error in " +\
                         "FileSocketApiClientHandler.process_msg: " +\

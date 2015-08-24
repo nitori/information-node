@@ -199,11 +199,11 @@ def send_json(sock, json_obj):
     length_bytes = struct.pack("!i", len(data))
     try:
         sock.send(length_bytes)
-    except socket.timeout:
+    except (socket.timeout, BrokenPipeError):
         return False
     try:
         sock.send(data)
-    except socket.timeout:
+    except (socket.timeout, BrokenPipeError):
         return False
     return True
 
@@ -213,7 +213,7 @@ def recv_json(sock, max_size=(1024 * 20)):
     while len(msg_size) < 4:
         try:
             new_data = sock.recv(4 - len(msg_size))
-        except socket.timeout:
+        except (socket.timeout, BrokenPipeError):
             return None
         if len(new_data) == 0:
             return None
@@ -230,7 +230,7 @@ def recv_json(sock, max_size=(1024 * 20)):
     while len(msg) < msg_size:
         try:
             new_data = sock.recv(msg_size - len(msg))
-        except socket.timeout:
+        except (socket.timeout, BrokenPipeError):
             return None
         if len(new_data) == 0:
             return None
