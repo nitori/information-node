@@ -57,7 +57,7 @@ class NodeWindow(uilib.Window):
             if self.node_state == NodeState.DATA_SERVER_OFF:
                 if uilib.Dialog.show_yesno(
                         "This node's data server is not running. Launch it?",
-                        "Data server is off"):
+                        title="Data server is off"):
                     action = self.app.actions.do(
                         self.node_path, "", tool="information-node",
                         cmd="node", answer_is_json=False)
@@ -219,6 +219,14 @@ class NodeWindow(uilib.Window):
         # add "Gateways" tab:
         self.gateways_tab = uilib.HBox()
         notebook.add(self.gateways_tab, "Gateways")
+
+        # add "Synchronization" tab:
+        self.synchronization_tab = uilib.HBox()
+        notebook.add(self.synchronization_tab, "Synchronization")
+
+        # add "Status" tab:
+        self.status_tab = uilib.HBox()
+        notebook.add(self.status_tab, "Status")
 
         return notebook
 

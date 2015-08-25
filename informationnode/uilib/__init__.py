@@ -232,6 +232,7 @@ class Dialog(Gtk.Dialog, WidgetMixin):
         dialog = Gtk.MessageDialog(parent, 0, Gtk.MessageType.ERROR,
             buttons=(Gtk.STOCK_NO, Gtk.ResponseType.CANCEL,
             Gtk.STOCK_YES, Gtk.ResponseType.OK))
+        dialog.set_title(title)
         dialog.format_secondary_text(text)
         response = dialog.run()
         dialog.destroy()
