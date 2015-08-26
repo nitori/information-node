@@ -31,6 +31,8 @@ import time
 from informationnode.daemon.daemon import Daemon
 from informationnode.daemon.identity import Identity
 from informationnode.helper import check_if_node_dir, check_if_node_runs
+from informationnode.helper import get_api_socket_for_node
+from informationnode.helper import recv_json, send_json
 from informationnode.helper import DoubleLineBreakFormatter
 
 parser = argparse.ArgumentParser(description=\
@@ -63,6 +65,25 @@ action_info_list = [
     particular node. It is safe to make this information public - it is
     enough to identify a node, but won't allow to decrypt the node's
     data''')),
+    ("ping", "<node-folder>",
+    "send a ping to the node's data server to see if it's still alive",
+    textwrap.dedent('''\
+    Send a ping to the node's data server to see if it's still alive.
+    Returns exit code 0 if the ping was successfully responded to by the
+    data server, otherwise exit code 1.
+    ''')),
+    ("shutdown", "<node-folder>",
+    "send a shutdown signal to the given node's data server",
+    textwrap.dedent('''\
+    Send a shutdown signal to the given node's data server, wait for the
+    server to cleanly terminate and then return exit code 0.
+
+    If the server is already off, this will also return exit code 0.
+
+    In case there was any sort of error shutting down the server, this will
+    return exit code 1. (This should only happen if the server is stuck
+    due to a programming bug and no longer responding)
+    ''')),
     ("link", "<target-host[:target-port]>",
     "link to remote node enabled at given interface",
     textwrap.dedent('''\
@@ -324,6 +345,16 @@ action_info_list = [
     [b]encrypt-for-target[/b], it will now [b]no longer be able to do so
     since that capability is linked with this cryptographic identity.[/b]'''
     )),
+    ("raw-cmd", "<node-folder>",
+    "send the raw JSON-formatted command from stdin to the node " +\
+        "and print the response",
+    textwrap.dedent('''\
+    Send the given raw command in JSON format to the given node's data server.
+    Afterwards, print the node's response (also JSON) on stdout.
+    
+    This can be useful if you want to access the node api through an
+    automated script with custom commands.
+    ''')),
 ]
 
 # make a nice access dictionary of the action info:
@@ -486,6 +517,10 @@ parser.add_argument("--faq",
     default=False, action="store_true",
     help="display a basic FAQ explaining how this tool is useful, " +\
         "what you should use it for and what not")
+parser.add_argument("--json", default=False, dest="json",
+    action="store_true",
+    help="return the output formatted as JSON instead of plain " +\
+        "human readable text as most commands do per default")
 parser.add_argument("argument", nargs="*",
     help="argument(s) to given action as specified above")
 
@@ -512,6 +547,7 @@ for arg in sys.argv[1:]:
         break
     main_args.append(arg)
 args = parser.parse_args(main_args)
+main_args = args
 
 # print faq if specified somewhere in the later args:
 if args.faq:
@@ -714,6 +750,176 @@ if args.action == "node":
 
     # if we arrive here, we are in the daemon process/thread. run daemon:
     Daemon(node_folder).run(api_socket)
+elif args.action == "ping":
+    subparser = argparse.ArgumentParser(prog=\
+        os.path.basename(sys.argv[0]) + " ping", description=\
+        action_info["ping"][3],
+        formatter_class=DoubleLineBreakFormatter)
+    subparser.add_argument("node-folder",
+        help="the node of which the data server should be pinged")
+    args = subparser.parse_args(subcmd_args)
+    setattr(args, "node_folder", getattr(args, "node-folder"))
+
+    # get api socket for the node:
+    (result, socket) = get_api_socket_for_node(args.node_folder)
+    if not result:
+        # whoops, didn't work.
+        if not main_args.json:
+            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        else:
+            print('{"action" : "client_error, "error_info" : '+\
+                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
+                 + '"}')
+        sys.exit(1)
+
+    # ping the daemon:
+    send_json(socket, {"action" : "ping"})
+    response = recv_json(socket)
+    socket.close()
+    if response["action"] == "pong":
+        if not main_args.json:
+            print("Pong received.")
+        else:
+            print(response)
+        sys.exit(0)
+    if not main_args.json:
+        print("inode-viewer-cli: error: invalid response.", file=sys.stderr)
+    else:
+        print('{"action" : "client_error, "error_info" : '+\
+            '"Invalid response received."}')
+    sys.exit(1)
+elif args.action == "shutdown":
+    subparser = argparse.ArgumentParser(prog=\
+        os.path.basename(sys.argv[0]) + " shutdown", description=\
+        action_info["shutdown"][3],
+        formatter_class=DoubleLineBreakFormatter)
+    subparser.add_argument("node-folder",
+        help="the node of which the data server should be shutdown")
+    args = subparser.parse_args(subcmd_args)
+    setattr(args, "node_folder", getattr(args, "node-folder"))
+
+    # check whether the node is already shutdown:
+    (result, msg) = check_if_node_dir(args.node_folder)
+    if result == True:
+        (result, msg) = check_if_node_runs(args.node_folder)
+        if result == False:
+            # it is, nothing to do.
+            if main_args.json:
+                print("{}")
+            sys.exit(0)
+
+    # get api socket for the node:
+    (result, socket) = get_api_socket_for_node(args.node_folder)
+    if not result:
+        # whoops, didn't work.
+        if not main_args.json:
+            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        else:
+            print('{"action" : "client_error, "error_info" : '+\
+                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
+                 + '"}')
+        sys.exit(1)
+
+    # send shutdown signal:
+    send_json(socket, {"action" : "shutdown"})
+    socket.close()
+
+    # wait for the daemon to remove the pidfile:
+    while os.path.exists(os.path.join(args.node_folder, "pidfile")):
+        time.sleep(0.2)
+
+    # wait a short moment for the process to go down (although it'd be already
+    # safe to launch a new data server instance at this point):
+    time.sleep(0.5)
+
+    print("{}")
+    sys.exit(0)
+elif args.action == "raw-cmd":
+    subparser = argparse.ArgumentParser(prog=\
+        os.path.basename(sys.argv[0]) + " raw-cmd", description=\
+        action_info["raw-cmd"][3],
+        formatter_class=DoubleLineBreakFormatter)
+    subparser.add_argument("node-folder",
+        help="the node to which this command should be sent")
+    subparser.add_argument("--bytes", default="-1",
+        help="the size of the input JSON you will provide in "+\
+        "exact bytes. Providing this speeds up input processing " +\
+        "for large inputs considerably.")
+    args = subparser.parse_args(subcmd_args)
+    setattr(args, "node_folder", getattr(args, "node-folder"))
+
+    # get input bytes length if specified:
+    try:
+        input_bytes = int(args.bytes)
+    except ValueError:
+        print("inode-viewer-cli: error: --bytes needs to be an integer",
+            file=sys.stderr)
+        sys.exit(1)
+    if input_bytes < -1 or input_bytes == 0:
+        print("inode-viewer-cli: error: input length in bytes needs "+\
+            "to be positive number", file=sys.stderr)
+        sys.exit(1)
+
+    # get api socket for the node:
+    (result, socket) = get_api_socket_for_node(args.node_folder)
+    if not result:
+        # whoops, didn't work.
+        if not main_args.json:
+            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+        else:
+            print('{"action" : "client_error, "error_info" : '+\
+                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
+                 + '"}')
+        sys.exit(1)
+    
+    # read JSON input from command line:
+    if input_bytes == -1:
+        # Supecial case where we don't know the input length.
+        # We need to periodically check if what we already got is valid
+        # complete JSON.
+        if platform.system().lower() == "windows":
+            print("inode-viewer-cli: error: raw-cmd without specified "+\
+                "input byte length not supported on windows. " +\
+                "Use --bytes", file=sys.stderr)
+            sys.exit(1)
+        input_selector = selectors.DefaultSelector()
+        input_selector.register(sys.stdin, EVENT_READ)
+        input_data = ""
+        while True:
+            events = input_selector.select()
+            for key, mask in events:
+                try:
+                    data = key.fileobj.read(1024)
+                except OSError:
+                    # end of stream or similar.
+                    json_obj = json.loads(input_data)
+                    break
+                if len(data) == 0:
+                    # end of stream.
+                    json_obj = json.loads(input_data)
+                    break
+                input_data += data
+                # see if this is already valid json:
+                try:
+                    json_obj = json.loads(input_data)
+                    break
+                except ValueError:
+                    continue  # nope. continue parsing
+    else:
+        # read the known input size:
+        input_data = sys.stdin.read(input_bytes)
+        json_obj = json.loads(input_data)
+
+    # send over socket:
+    send_json(socket, json_obj) 
+    
+    # get response:
+    response_obj = recv_json(socket)
+    socket.close()
+
+    # print response:
+    print(json.dumps(response_obj))
+    sys.exit(0)
 else:
     if args.action in action_info:
         print("Dear user,")

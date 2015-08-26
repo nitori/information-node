@@ -36,7 +36,8 @@ class ViewerLogWindow(uilib.Window):
 
         vbox.add(uilib.Label("Due to the sensitive nature of this log, " +\
             "it needs to be enabled using --debug-history.\nIt will "+\
-            "only be stored in memory until the viewer quits, not on disk."))\
+            "only be stored in memory until the viewer quits, not on disk.",
+            line_breaks=True))\
             .set_alignment(0, 0.5)
 
         hbox = uilib.HBox()

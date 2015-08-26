@@ -23,7 +23,7 @@ import subprocess
 
 class NodeAction(object):
     def __init__(self, node_path, json_request,
-            tool="inode-viewer-cli", cmd="raw-cmd",
+            tool="information-node", cmd="raw-cmd",
             cmd_args=[], answer_is_json=True, reason=None):
         self.answer_is_json = answer_is_json
         self.node_path = node_path

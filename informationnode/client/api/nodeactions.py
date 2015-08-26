@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
 from informationnode.client.api.nodeaction import NodeAction
+import logging
 import os
 import subprocess
 
@@ -36,7 +37,7 @@ class NodeActions(object):
         except subprocess.CalledProcessError:
             return False
 
-    def do(self, node_url, json, tool="inode-viewer-cli",
+    def do(self, node_url, json, tool="information-node",
             cmd="raw-cmd", cmd_args=[], answer_is_json=False,
             reason="unspecified"):
         if not self.are_tools_installed():
@@ -46,7 +47,9 @@ class NodeActions(object):
         action = NodeAction(node_url, json, tool=tool, cmd=cmd,
             cmd_args=cmd_args, answer_is_json=answer_is_json,
             reason=reason)
+        print("keep history: " + str(self.keep_history))
         if self.keep_history:
+            print("putting into history: " + str(action))
             if not node_url in self.history:
                 self.history[node_url] = []
             self.history[node_url].append(action)

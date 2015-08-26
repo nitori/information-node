@@ -40,7 +40,7 @@ class CreateNodeDialog(uilib.Dialog):
         vbox.add(
             uilib.Label("This location will contain all the node's "+\
             "stored data and such.\nIt should be an empty or " +\
-            "new folder.")).set_alignment(0, 0.5)
+            "new folder.", line_breaks=True)).set_alignment(0, 0.5)
 
         self.set_modal(True)
         vbox.show_all()

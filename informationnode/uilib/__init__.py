@@ -163,8 +163,49 @@ class MenuBar(Gtk.MenuBar, WidgetMixin):
         return menu_entry
 
 class Label(Gtk.Label, WidgetMixin):
-    pass
-        
+    def __new__(cls, *args, line_breaks=False, **kwargs):
+        if not line_breaks:
+            return super().__new__(cls, *args, **kwargs)
+        else:
+            class MultilineLabel(Gtk.TextView, WidgetMixin):
+                def __init__(self, text, *args, **kwargs):
+                    super().__init__()
+                    self._buffer = Gtk.TextBuffer()
+                    self.set_buffer(self._buffer)
+                    self.set_wrap_mode(Gtk.WrapMode.WORD)
+
+                    # get window foreground color:
+                    w = Gtk.Window()
+                    w.realize()
+                    context = w.get_style_context()
+                    bg_color = context.get_background_color(
+                        Gtk.StateType.NORMAL)
+                    w.destroy()
+                    del(w)
+
+                    # get the label foreground color:
+                    l = Gtk.Window()
+                    l.realize()
+                    context = l.get_style_context()
+                    fg_color = context.get_color(
+                        Gtk.StateType.NORMAL)
+                    l.destroy()
+                    del(l)
+
+                    self.override_background_color(Gtk.StateType.NORMAL,
+                        bg_color)
+                    self.override_color(Gtk.StateType.NORMAL, fg_color)
+                    self.set_editable(False)
+                    self.set_cursor_visible(False)
+                    self._buffer.set_text(text)
+                    return
+
+                def set_alignment(self, *args, **kwargs):
+                    """ This is supported by Gtk.Label, but not by our
+                        multiline label -> we ignore it. """
+                    pass  
+            return MultilineLabel(*args, **kwargs)
+ 
 class Notebook(Gtk.Notebook, WidgetMixin):
     def __init__(self, *args, **kwargs):
         super(Notebook, self).__init__(*args, **kwargs)
@@ -239,6 +280,10 @@ class Dialog(Gtk.Dialog, WidgetMixin):
         if response == Gtk.ResponseType.OK:
             return True
         return False
+
+class List(WidgetMixin):
+    def append(self, text_or_widget):
+        pass
 
 class AboutDialog(Gtk.AboutDialog, WidgetMixin):
     pass
