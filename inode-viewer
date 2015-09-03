@@ -53,7 +53,11 @@ except ImportError:
     gtk_available = False
 
 if not gtk_available:
-    import tkinter
+    try:
+        import tkinter
+    except ImportError:
+        print("FATAL ERROR: *** tkinter missing. ***", file=sys.stderr)
+        sys.exit(1)
     import tkinter.messagebox as tkMessageBox
     if platform.system().lower() == "windows":
         # display notice and install it
@@ -81,7 +85,7 @@ if not gtk_available:
                make sure to check GTK+3
                
             4. When you are done, launch the viewer again.'''))
-        sys.exit(0)
+        sys.exit(1)
     else:
         # display notice and install it
         root = tkinter.Tk()
@@ -90,7 +94,7 @@ if not gtk_available:
             textwrap.dedent('''\
             GTK+3/PyGObject is missing. Please install it.
             '''))
-        sys.exit(0)    
+        sys.exit(1)    
         
 # check whether PyCrypto is present:
 pycrypto_available = True
@@ -100,7 +104,11 @@ except ImportError:
     pycrypto_available = False
 
 if not pycrypto_available:
-    import tkinter
+    try:
+        import tkinter
+    except ImportError:
+        print("FATAL ERROR: *** tkinter missing. ***", file=sys.stderr)
+        sys.exit(1)
     import tkinter.messagebox as tkMessageBox
     if platform.system().lower() == "windows":
         # display notice and install it
@@ -130,7 +138,7 @@ if not pycrypto_available:
             textwrap.dedent('''\
             
             4. When you are done, launch the viewer again.'''))
-        sys.exit(0)
+        sys.exit(1)
     else:
         # display notice and install it
         root = tkinter.Tk()
@@ -139,7 +147,7 @@ if not pycrypto_available:
             textwrap.dedent('''\
             PyCrypto is missing. Please install it.
             '''))
-        sys.exit(0)  
+        sys.exit(1)  
 
 from informationnode.uilib import uilib_main_loop, uilib_quit
 from informationnode.client.ui.nodewindow import NodeWindow

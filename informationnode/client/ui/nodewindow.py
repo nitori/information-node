@@ -21,6 +21,7 @@ from enum import Enum
 from gi.repository import Gtk
 from informationnode.helper import check_if_node_dir, check_if_node_runs
 import informationnode.uilib as uilib
+from informationnode.client.node import Node, NodeState
 from informationnode.client.ui.createnodedlg import CreateNodeDialog
 from informationnode.client.ui.viewerlogwindow import ViewerLogWindow
 import logging
@@ -30,70 +31,51 @@ import time
 
 logging.basicConfig(level=logging.DEBUG)
 
-class NodeState(Enum):
-    UNKNOWN=0
-    DATA_SERVER_OFF=1
-    DATA_SERVER_ON=2
-    DATA_SERVER_UNREACHABLE=3
-
 class NodeWindow(uilib.Window):
-    def __init__(self, app, node_path):
+    def __init__(self, app, node):
         super().__init__()
 
         self.app = app
 
         self.node_state = NodeState.UNKNOWN
-        self.node_path = node_path
+        self.node = node
+
         self.menu = self.build_menu()
         self.add(self.menu)
         
         self.build_notebook()
 
-        self.detect_node_state()
+        self.update_node_state()
         self.node_state_popup()
 
     def node_state_popup(self):
-        if self.node_path != None:
-            if self.node_state == NodeState.DATA_SERVER_OFF:
+        if self.node != None and not self.node.can_use():
+            if self.node.state == NodeState.DATA_SERVER_OFF:
                 if uilib.Dialog.show_yesno(
                         "This node's data server is not running. Launch it?",
                         title="Data server is off"):
-                    action = self.app.actions.do(
-                        self.node_path, "", tool="information-node",
-                        cmd="node", answer_is_json=False)
-                    (result, content) = action.run()
+                    (result, content) = self.node.launch_data_server()
                     if not result:
                         uilib.Dialog.show_error(
                             "Launching the data server failed: " +\
                              str(content),
                             "Failed to launch data server", parent=self)
-                        self.node_path = None
-                        self.node_state = NodeState.UNKNOWN
-                        self.detect_node_state()
+                        self.update_node_state()
                         return
-                    self.node_state = NodeState.UNKNOWN
-                    self.detect_node_state()
+                    self.update_node_state()
                     self.node_state_popup()
-                else:
-                    self.node_path = None
-                    self.node_state = NodeState.UNKNOWN
-                    self.detect_node_state()
-            elif self.node_state == NodeState.DATA_SERVER_UNREACHABLE:
+                    return
+            elif self.node.state == NodeState.DATA_SERVER_UNREACHABLE:
                 uilib.Dialog.show_error( # FIXME TEXT
                     "Cannot use this node, data server is unreachable. " +\
                     "Try terminating and restarting the data server.",
                     parent=self)
-                self.node_path = None
-                self.node_state = NodeState.UNKNOWN
-                self.detect_node_state()
-            elif self.node_state != NodeState.DATA_SERVER_ON:
+                self.update_node_state()
+            else:
                 uilib.Dialog.show_error(
                     "Cannot use this node, data server was " +\
                     "detected in unknown state: " + str(self.node_state),
                     "Data server in unknown state", parent=self)
-                self.node_path = None
-                self.node_state = NodeState.UNKNOWN
-                self.detect_node_state()
 
     def show_long_action_notice(self,
             operation="This might take a moment..."):
@@ -129,41 +111,25 @@ class NodeWindow(uilib.Window):
             return
         self.long_action_win.destroy()
 
-    def check_node_data_server(self):
-        # check if there's a data server process:
-        (result, msg) = check_if_node_runs(self.node_path)
-        if result == None:
-            uilib.Dialog.show_error(
-                "Node has invalid state: " + str(msg),
-                "Error when checking node state",
-                parent=self)
-            self.node_path = None
-            return
-        if result != True:
-            self.node_state = NodeState.DATA_SERVER_OFF
-            return
-
-        # ping the data server:
-        action = self.app.actions.do(
-            self.node_path, "", cmd="ping")
-        (result, content) = action.run()
-        if not result:
-            self.node_state = NodeState.DATA_SERVER_UNREACHABLE
-        else:
-            self.node_state = NodeState.DATA_SERVER_ON
-
     def build_notebook(self):
-        if self.node_path == None:
+        if self.node == None:
             self.notebook = self.build_welcome_notebook()
         else:
             self.notebook = self.build_node_notebook()
         self.add(self.notebook, expand=True)
         self.notebook.show_all()
+        self.notebook_update_usable_state()
 
     def rebuild_notebook(self):
         self.destroy_notebook()
         assert(not hasattr(self, "notebook"))
         self.build_notebook()
+
+    def notebook_update_usable_state(self):
+        if self.node == None:
+            return
+        can_use = self.node.can_use()    
+        pass
 
     def destroy_notebook(self):
         if not hasattr(self, "notebook"):
@@ -283,27 +249,44 @@ class NodeWindow(uilib.Window):
 
         return notebook
 
-    def detect_node_state(self):
+    def update_node_state(self):
         """ Change this node window's entire state based on whether it has
-            currently a node opened or not, and detect the detailed state.
+            currently a node opened or not, and whether the node can be used
+            right now.
         """
-        opened = (self.node_path != None)
+        opened = (self.node != None)
 
-        # check for detailed data server state if necessary:
-        if opened:
-            if self.node_state == NodeState.UNKNOWN:
-                self.check_node_data_server()
-        
+        previously_opened = True
+        if hasattr(self, "welcome_tab"):
+            previously_opened = False
+
+        previously_usable = False
+        if self.menu.logmenu.dataserver.enabled():
+            previously_usable = True
+
         # adapt window/menus to reflect the state:
-        if opened and self.node_path != None:
+        if opened:
+            can_use = self.node.can_use()
             self.menu.nodemenu.close.enable()
-            self.menu.logmenu.dataserver.enable()
-            self.set_title("Node: " + self.node_path)
+            if can_use:
+                self.menu.logmenu.dataserver.enable()
+            else:
+                self.menu.logmenu.dataserver.disable()
+            self.set_title("Node: " + self.node.path + (\
+                " [Disconnected]" if not can_use else ""))
         else:
             self.menu.nodemenu.close.disable()
             self.menu.logmenu.dataserver.disable()
             self.set_title("Information Node Viewer")
-        self.rebuild_notebook()
+        
+        # rebuild notebook if necessary:
+        if previously_opened != opened:
+            self.rebuild_notebook()
+
+        # update notebook usable state:
+        if opened and previously_opened:
+            if previously_usable != self.node.can_use():
+                self.notebook_update_usable_state()
 
     def nodemenu_open_remote(self, widget):
         print("TEST")        
@@ -321,31 +304,29 @@ class NodeWindow(uilib.Window):
         if fpath != None:
             self.show_long_action_notice(
                 "Creating a new information node...")
-            action = self.app.actions.do(
-                fpath, "", tool="information-node",
-                cmd="node", answer_is_json=False)
-            (result, content) = action.run()
-            self.hide_long_action_notice()
-            if not result:
+            try:
+                node = Node(self.app, fpath, create_new=True)
+            except (RuntimeError, ValueError) as e:
                 uilib.Dialog.show_error(
-                    "The node creation failed: " + str(content),
+                    "The node creation failed: " + str(e),
                     "Failed to create node", parent=self)
             else:
-                if self.node_path == None:
+                if self.node == None:
                     # this window has no node opened, open it in here
-                    self.node_path = fpath
-                    self.detect_node_state()
+                    self.node = node
+                    self.update_node_state()
                     self.node_state_popup()
                 else:
                     # open it in a new window:
-                    new_win = NodeWindow(self.app, fpath)
+                    new_win = NodeWindow(self.app, node)
                     self.app.add_window(new_win)
 
     def nodemenu_close(self, widget):
-        if self.node_path == None:
+        if self.node == None:
             return
-        self.node_path = None
-        self.detect_node_state()    
+        del(self.node)
+        self.node = None
+        self.update_node_state()    
 
     def nodemenu_quit(self, widget):
         sys.exit(0)
@@ -370,26 +351,26 @@ class NodeWindow(uilib.Window):
             dlg.destroy()
 
             # see if this is a valid node:
-            (result, msg) = check_if_node_dir(directory)
-            if not result:
+            try:
+                node = Node(self.app, directory)
+            except (RuntimeError, ValueError) as e:
                 dialog = Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
                     Gtk.ButtonsType.OK,
                     "Cannot access node")
                 dialog.format_secondary_text(
-                    "Cannot access the specified node: " + str(msg))
+                    "Cannot access the specified node: " + str(e))
                 dialog.run()
                 dialog.destroy()
                 return
 
-            # open the node up:
-            if self.node_path == None:
+            if self.node == None:
                 # this window has no node opened, open it in here
-                self.node_path = directory
-                self.detect_node_state()
+                self.node = node
+                self.update_node_state()
                 self.node_state_popup()
             else:
                 # open it in a new window:
-                new_win = NodeWindow(self.app, directory)
+                new_win = NodeWindow(self.app, node)
                 self.app.add_window(new_win)
             
         else:

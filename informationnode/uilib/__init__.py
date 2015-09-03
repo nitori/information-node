@@ -66,6 +66,9 @@ class WidgetMixin(object):
     def disable(self):
         self.set_sensitive(False)
 
+    def enabled(self):
+        return self.get_sensitive()
+
 class Window(Gtk.Window, WidgetMixin):
     def __init__(self):
         super(Window, self).__init__()
