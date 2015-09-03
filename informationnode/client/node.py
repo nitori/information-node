@@ -32,8 +32,9 @@ class NodeState(Enum):
     INVALID_STATE=4
 
 class Node(object):
-    """ The model which manages a node at a specific directory. Used by the UI
-        to represent and manage a node.
+    """ The model which manages a node at a specific directory through a
+        connection to the node's data server. Used by the client UI to
+        represent and manage a node.
 
         The node will be immediately opened or created in the constructor, so
         expect the instance creation to hang for a while (up to ~20 seconds).
@@ -73,10 +74,8 @@ class Node(object):
                 raise RuntimeError("information node creation failed: " +\
                     str(content))
 
-        print("WILL DETECT STATE")
         # detect the node state.
         self._detect_state()
-        print("RESULTING STATE: " + str(self.state))
 
     def can_use(self):
         """ Check if this node is in any usable state. If not, you will either
@@ -103,6 +102,7 @@ class Node(object):
             cmd="node", answer_is_json=False)
         (result, content) = action.run()
         if result:
+            self.state = NodeState.UNKNOWN
             self._detect_state()
         return (result, content)
 
@@ -116,7 +116,6 @@ class Node(object):
         """
         if self.state == NodeState.DATA_SERVER_ON and not force_recheck:
             return
-        print("CHECKING DATA SERVER")
 
         # check if there's a data server process:
         (result, msg) = check_if_node_runs(self.path)
@@ -125,7 +124,6 @@ class Node(object):
             return
         if result != True:
             self.state = NodeState.DATA_SERVER_OFF
-            print("DATA SERVER IS OFF")
             return
 
         # ping the data server:

@@ -34,7 +34,7 @@ class NodeActions(object):
                 subprocess.check_output(["information-node", "--help"],
                     stderr=nullfile)
             return True
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, FileNotFoundError):
             return False
 
     def do(self, node_url, json, tool="information-node",
