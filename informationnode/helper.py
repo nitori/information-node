@@ -1,7 +1,7 @@
 
 '''
 information-node - an advanced tool for data synchronization
-Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+Copyright (C) 2015  Information Node Development Team (see AUTHORS.md)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

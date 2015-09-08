@@ -1,7 +1,7 @@
 
 '''
 information-node - an advanced tool for data synchronization
-Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+Copyright (C) 2015  Information Node Development Team (see AUTHORS.md)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,6 +39,9 @@ class IdentityPrivateKey(object):
             raise ValueError("RSA key has no private key info")
 
 class Identity(object):
+    """ A cryptographic RSA identity which can be used for asymmetric
+        encryption.
+    """
     def __init__(self, from_file=None):
         if from_file == None:
             # generate a new pair
@@ -57,6 +60,28 @@ class Identity(object):
                 self.private_key = IdentityPrivateKey(key)
             else:
                 self.private_key = None
+
+    def encrypt_with_rsa(self, value):
+        """ Encrypt an X-bit value with this identity. The length must match
+            exactly X bits. If you want to encrypt longer values, use this to
+            encrypt an AES key instead and use AES to encrypt your actual data
+            stream.
+
+            Returns the encrypted bytes.
+        """
+        raise RuntimeError("not implemented yet")
+
+    def decrypt_with_rsa(self, value):
+        """ Decrypt an X bit long value with this identity.
+
+            This can only be done if this identity contains the private key
+            part (which means it cannot be just instantiated from the pure
+            public information).
+
+            Returns the decrypted bytes, or raises a ValueError if decryption
+            failed.
+        """
+        raise RuntimeError("not implemented yet")
 
     def save_to_file(self, path, passphrase=None):
         if self.private_key == None:

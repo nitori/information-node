@@ -1,7 +1,7 @@
 
 '''
 information-node - an advanced tool for data synchronization
-Copyright (C) 2015  information-node Development Team (see AUTHORS.md)
+Copyright (C) 2015  Information Node Development Team (see AUTHORS.md)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,30 +23,84 @@ import json
 import uuid
 
 class PasswordEncryption(object):
-    def __init__(self, password_pubkey_path, password_privkey_path):
+    """ This is a password encryption which uses a pub/private RSSA key pair
+        which is specified to secure an AES stream for item encryption.
+
+        What does this class do in detail:
+
+        Usually, an RSA identity would be used for each separate password used
+        (shared among all items that are encrypted with this password), and
+        the private key would be stored encrypted with the given password.
+
+        This structure just handles AES with the given identity - you need to
+        handle storing the RSA identity (including the required private key
+        encryption with the password) elsewhere.
+
+        TODO: document where the RSA identities for pw encryption are handled
+    """
+    def __init__(self, password_pubkey_path, password_privkey_path,\
+            password, aes_info_path=None):
         self.password_pubkey_path = password_pubkey_file
         self.password_privkey_path = password_privkey_file
 
+        # get AES key:
+        if aes_info_path != None:
+
+        else:
+            # generate new AES key:
+            self.aes_key = os.urandom(32)
+
+    def save_encrypted_aes_info(self, path):
+        pass
+
 class TargetNodeEncryption(object):
-    def __init__(self, target_node_pubkey):
+    """ This handles asymmetric encryption for another information node's
+        public RSA identity information which must be provided.
+
+        It will then encrypt an AES stream which can only be opened with the
+        target node's information key (unless one day RSA is broken of
+        course).
+    """
+    def __init__(self, target_node_pubkey, aes_info_path=None):
         self.target_node_pubkey = target_node_pubkey
         self.privkey = None
+
+        # get AES key:
+        if aes_info_path != None:
+            # load up and decrypt from file:
+            
+        else:
+            # generate new AES key:
+            self.aes_key = os.urandom(32)
+
+    def save_encrypted_aes_info(self, path):
+        pass
 
     def set_decryption_private_key(self, target_node_privkey):
         self.privkey = target_node_privkey
 
     def encrypt(self, data):
-         
+        
         return data
 
     def decrypt(self, data):
         pass
 
 class Item(object):
-    def __init__(self, suggested_identifier, content_version=1):
+    """ This item structure is the base for all user data stored in an
+        information node.
+
+        Each item maps to a folder in the node's storage directory. In there,
+        it has a separate subfolder for each content_version, where the actual
+        data, encryption details etc are stored.
+
+        Use a QueryItems instance to manage those items.
+    """
+    def __init__(self, suggested_identifier, \
+            encryption=None, content_version=1):
         self.mime_type = "text/plain"
         self.classification = "file"
-        self.encryption = None
+        self.encryption = encryption
         self.identifier = None
         self.content_version_id = content_version
         self.contents_finalized = True
@@ -119,6 +173,12 @@ class Item(object):
                 'with a newer content version instead.') 
 
 class QueryItems(object):
+    """ A manager to query data items from the storage with various means.
+    """
+    def __init__(self, node_folder):
+        self.storage_path = os.path.normpath(\
+            os.path.join(os.path.abspath(node_folder), node_folder))
+
     def get_by_id(self, identifier):
         """ Get all versions of the item with this identifier. """
         items = []
