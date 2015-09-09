@@ -97,6 +97,22 @@ class TargetNodeEncryption(object):
     def decrypt(self, data):
         pass
 
+class ItemChunk(object):
+    def __init__(self, item):
+        self.item = item
+
+    def size(self):
+        """ Size of the data contained in thus chunk, or None if not currently
+            known.
+        """
+        return None
+
+    def set_data(self, value):
+        pass
+
+    def get_data(self):
+        pass
+
 class Item(object):
     """ This item structure is the base for all user data stored in an
         information node.
@@ -107,6 +123,7 @@ class Item(object):
 
         Use a QueryItems instance to manage those items.
     """
+    CHUNK_SIZE=(1024 * 1)
     def __init__(self, suggested_identifier, \
             encryption=None, content_version=1):
         self.mime_type = "text/plain"
@@ -118,6 +135,8 @@ class Item(object):
         self.creation_time = datetime.datetime.now()
         self.modification_time = datetime.datetime.now()
         self.raw_data = None
+        self.raw_chunk_data = list()
+
         if suggested_identifier != None:  # this is a new item:
             # this should be pretty free of collisions, given the
             # suggested identifier:
@@ -126,6 +145,9 @@ class Item(object):
 
             # new item that isn't finalized:
             self.contents_finalized = False
+        else: # initialize item from disk
+            pass
+
         return item
 
     def save(self):
@@ -138,31 +160,60 @@ class Item(object):
         raise RuntimeError("needs storage driver implementation")
 
     def unlock_encryption_with_password(self, password):
+        """ Required for password-protected items to read or modify them.
+            When the item is initially created it will be unlocked, but
+            otherwise unlocking is required for any sort of access.
+        """
+        return
+
+    def unlock_encryption_with_identity(self, identity):
+        """ Unlock the item contents with the given RSA identity if it was
+            encrypted for a specific target node.
+
+            Returns ValueError if unlocking failed.
+        """
         return
 
     def lock_encryption(self):
+        """ If encryption was enabled and unlocked for this item, the password
+            and/or crypto data will be forgotten again. Unless you unlock, the
+            item can neither be read nor modified.
+        """
         return
 
     def ensure_target_node_encryption_aes_key(self):
         pass 
 
-
     def content_chunk_count(self):
-        return 0
+        return len(self.raw_chunk_data)
 
     def content_get(self, chunk_no):
-        return None
+        return self.raw_chunk_data[chunk_no].get_data()
 
-    def content_set_chunk(self, chunk_no, value):
+    def content_set_chunk(self, chunk_no, data):
         # only allow write access if content hasn't been finalized:
         if self.contents_finalized:
             raise RuntimeError('item has been finalized. open a new one '+\
                 'with a newer content version instead.')
+
         # deal with encryption
         if self.encryption != None:
             #
             pass
-        self.raw_chunk_data[chunk_no] = value
+
+        # fill up previous unused chunks:
+        while len(self.raw_chunk_data) < chunk_no:
+            self.raw_chunk_data.append(ItemChunk(self))
+
+        # create new chunk:
+        chunk = ItemChunk(self)
+        chunk.set_data(value)
+
+        # append or replace depending on index:
+        if len(self.raw_chunk_data) == chunk_no:
+            self.raw_chunk_data.append(chunk)
+        else:
+            self.raw_chunk_data[chunk_no] = chunk
 
     def crop_chunks(self, chunk_amount):
         # only allow write access if content hasn't been finalized:
