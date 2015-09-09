@@ -22,6 +22,8 @@ import hashlib
 import json
 import uuid
 
+from informationnode.daemon.identity import Identity
+
 class PasswordEncryption(object):
     """ This is a password encryption which uses a pub/private RSSA key pair
         which is specified to secure an AES stream for item encryption.
@@ -38,14 +40,20 @@ class PasswordEncryption(object):
 
         TODO: document where the RSA identities for pw encryption are handled
     """
-    def __init__(self, password_pubkey_path, password_privkey_path,\
+    def __init__(self, password_rsa_path,\
             password, aes_info_path=None):
         self.password_pubkey_path = password_pubkey_file
         self.password_privkey_path = password_privkey_file
 
         # get AES key:
         if aes_info_path != None:
-
+            with open(aes_info_path, "rb") as f:
+                key_enc = f.read(256)  # read 256bit key + info
+            identity = Identity(password_rsa_path)
+            decrypted_info = identity.decrypt(key_enc)
+            if len(decrypted_info != 32):
+                raise ValueError("AES key info has wrong length")
+            
         else:
             # generate new AES key:
             self.aes_key = os.urandom(32)
@@ -64,20 +72,23 @@ class TargetNodeEncryption(object):
     def __init__(self, target_node_pubkey, aes_info_path=None):
         self.target_node_pubkey = target_node_pubkey
         self.privkey = None
+        self.aes_info_path = aes_info_path
 
-        # get AES key:
-        if aes_info_path != None:
-            # load up and decrypt from file:
-            
-        else:
-            # generate new AES key:
-            self.aes_key = os.urandom(32)
+        # generate new AES key:
+        self.aes_key = os.urandom(32)
 
     def save_encrypted_aes_info(self, path):
         pass
 
-    def set_decryption_private_key(self, target_node_privkey):
+    def set_decryption_private_key(self, target_node_privkey,
+            passphrase=None):
         self.privkey = target_node_privkey
+        with open(self.aes_info_path, "rb") as f:
+            key_enc = f.read(256)  # read 256bit key + info
+        identity = Identity(target_node_privkey, passphrase=passphrase)
+        decrypted_info = identity.decrypt(key_enc)
+        if len(decrypted_info != 32):
+            raise ValueError("AES key has wrong length")
 
     def encrypt(self, data):
         
@@ -158,7 +169,6 @@ class Item(object):
         if self.contents_finalized:
             raise RuntimeError('item has been finalized. open a new one '+\
                 'with a newer content version instead.')
-        
 
     def content_set_from_file(self, file_path):
         # only allow write access if content hasn't been finalized:
@@ -182,6 +192,6 @@ class QueryItems(object):
     def get_by_id(self, identifier):
         """ Get all versions of the item with this identifier. """
         items = []
-        
+
 
 

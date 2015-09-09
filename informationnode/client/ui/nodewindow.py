@@ -307,19 +307,22 @@ class NodeWindow(uilib.Window):
             try:
                 node = Node(self.app, fpath, create_new=True)
             except (RuntimeError, ValueError) as e:
+                self.hide_long_action_notice()
                 uilib.Dialog.show_error(
                     "The node creation failed: " + str(e),
                     "Failed to create node", parent=self)
+                return
+            self.hide_long_action_notice()
+ 
+            if self.node == None:
+                # this window has no node opened, open it in here
+                self.node = node
+                self.update_node_state()
+                self.node_state_popup()
             else:
-                if self.node == None:
-                    # this window has no node opened, open it in here
-                    self.node = node
-                    self.update_node_state()
-                    self.node_state_popup()
-                else:
-                    # open it in a new window:
-                    new_win = NodeWindow(self.app, node)
-                    self.app.add_window(new_win)
+                # open it in a new window:
+                new_win = NodeWindow(self.app, node)
+                self.app.add_window(new_win)
 
     def nodemenu_close(self, widget):
         if self.node == None:
