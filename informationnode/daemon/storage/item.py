@@ -98,8 +98,30 @@ class TargetNodeEncryption(object):
         pass
 
 class ItemChunk(object):
-    def __init__(self, item):
+    def __init__(self, item, no):
         self.item = item
+        self.no = no
+        self.on_disk = False
+
+    def transfer_to_disk(self):
+        """ Transfer the chunk data from memory to disk.
+        """
+        if self.on_disk:
+            return
+        self.on_disk = True
+        del(self.data)
+
+    def transfer_from_disk(self):
+        """ Load chunk data from disk.
+        """
+        if not self.on_disk:
+            return
+        self.on_disk = False
+
+    def delete_data(self):
+        """ Delete this chunk's data, including from disk if any.
+        """
+        raise RuntimeError("not implemented yet")
 
     def size(self):
         """ Size of the data contained in thus chunk, or None if not currently
@@ -108,10 +130,12 @@ class ItemChunk(object):
         return None
 
     def set_data(self, value):
-        pass
+        if self.on_disk:
+            self.on_disk = False
+        self.data = value
 
     def get_data(self):
-        pass
+        return self.data
 
 class Item(object):
     """ This item structure is the base for all user data stored in an
@@ -123,7 +147,7 @@ class Item(object):
 
         Use a QueryItems instance to manage those items.
     """
-    CHUNK_SIZE=(1024 * 1)
+    CHUNK_SIZE=(1024 * 100)
     def __init__(self, suggested_identifier, \
             encryption=None, content_version=1):
         self.mime_type = "text/plain"
@@ -135,7 +159,8 @@ class Item(object):
         self.creation_time = datetime.datetime.now()
         self.modification_time = datetime.datetime.now()
         self.raw_data = None
-        self.raw_chunk_data = list()
+        self.raw_chunk_data = dict()
+        self.chunk_count = 0
 
         if suggested_identifier != None:  # this is a new item:
             # this should be pretty free of collisions, given the
@@ -185,9 +210,17 @@ class Item(object):
         pass 
 
     def content_chunk_count(self):
-        return len(self.raw_chunk_data)
+        return self.chunk_count
 
     def content_get(self, chunk_no):
+        if chunk_no >= self.chunk_count or chunk_no < 0:
+            raise ValueError('no chunk with id ' + str(chunk_no))
+
+        # load up chunk if not there:
+        if not chunk_no in self.raw_chunk_data:
+            self.raw_chunk_data = ItemChunk(self, chunk_no)
+
+        # return data:
         return self.raw_chunk_data[chunk_no].get_data()
 
     def content_set_chunk(self, chunk_no, data):
@@ -201,19 +234,16 @@ class Item(object):
             #
             pass
 
-        # fill up previous unused chunks:
-        while len(self.raw_chunk_data) < chunk_no:
-            self.raw_chunk_data.append(ItemChunk(self))
+        # increase total chunk count if necessary:
+        self.chunk_count = max(self.chunk_count, chunk_no - 1)
+        if chunk_no in self.raw_chunk_data:
+            self.raw_chunk_data[chunk_no].set_data(data)
+            return
 
         # create new chunk:
-        chunk = ItemChunk(self)
+        chunk = ItemChunk(self, chunk_no)
         chunk.set_data(value)
-
-        # append or replace depending on index:
-        if len(self.raw_chunk_data) == chunk_no:
-            self.raw_chunk_data.append(chunk)
-        else:
-            self.raw_chunk_data[chunk_no] = chunk
+        self.raw_chunk_data[chunk_no] = chunk
 
     def crop_chunks(self, chunk_amount):
         # only allow write access if content hasn't been finalized:
@@ -232,17 +262,6 @@ class Item(object):
         if self.contents_finalized:
             raise RuntimeError('item has been finalized. open a new one '+\
                 'with a newer content version instead.') 
-
-class QueryItems(object):
-    """ A manager to query data items from the storage with various means.
-    """
-    def __init__(self, node_folder):
-        self.storage_path = os.path.normpath(\
-            os.path.join(os.path.abspath(node_folder), node_folder))
-
-    def get_by_id(self, identifier):
-        """ Get all versions of the item with this identifier. """
-        items = []
 
 
 
