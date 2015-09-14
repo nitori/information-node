@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import datetime
 import hashlib
 import json
+import os
+import struct
 import uuid
 
 from informationnode.daemon.identity import Identity
@@ -77,18 +79,34 @@ class TargetNodeEncryption(object):
         # generate new AES key:
         self.aes_key = os.urandom(32)
 
+        # generate new counter:
+        self.ctr_iv = struct.unpack("=Q", os.urandom(8))[0]
+        self.counter = Crypto.Util.Counter.new(128, initial_value=self.ctr_iv)
+
     def save_encrypted_aes_info(self, path):
-        pass
+        """ Save the encrypted AES key + CTR IV to a file where it can be
+            loaded from again (but only read by someone with the RSA private
+            key).
+        """
+
+        # collect all the required data as bytes:
+        info_bytes = b""
+        info_bytes += struct.pack("!Q", os.urandom(8))[0]
+        info_bytes += self.aes_key
+
+        # encrypt it:
 
     def set_decryption_private_key(self, target_node_privkey,
             passphrase=None):
         self.privkey = target_node_privkey
+        
+        # decrypt AES key + counter info:
         with open(self.aes_info_path, "rb") as f:
             key_enc = f.read(256)  # read 256bit key + info
         identity = Identity(target_node_privkey, passphrase=passphrase)
         decrypted_info = identity.decrypt(key_enc)
-        if len(decrypted_info != 32):
-            raise ValueError("AES key has wrong length")
+        if len(decrypted_info) != 32 + 8:
+            raise ValueError("AES info has wrong length")
 
     def encrypt(self, data):
         
