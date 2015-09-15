@@ -24,6 +24,7 @@ import os
 import platform
 import re
 import socket
+import subprocess
 import sys
 import textwrap
 import time
@@ -694,7 +695,7 @@ if args.action == "node":
 
     # on windows, open up api socket at any port, and write port to file:
     if platform.system().lower() == "windows" and args.foreground:
-        api_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        api_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         api_socket.bind(("::0", 0))
         port = api_socket.getsockname()[1]
         f = open(os.path.join(node_folder, "api_access.port"), "wb")
