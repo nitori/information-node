@@ -67,43 +67,21 @@ class ItemChunk(object):
     def get_data(self):
         return self.data
 
-class Item(object):
-    """ This item structure is the base for all user data stored in an
-        information node.
-
-        Each item maps to a folder in the node's storage directory. In there,
-        it has a separate subfolder for each content_version, where the actual
-        data, encryption details etc are stored.
-
-        Use a QueryItems instance to manage those items.
-    """
-    CHUNK_SIZE=(1024 * 100)
-    def __init__(self, suggested_identifier, \
+class ItemChunkManager(object):
+    CHUNK_STREAM_LENGTH=32
+    def __init__(self, chunk_size, identifier, \
             encryption=None, content_version=1):
-        self.mime_type = "text/plain"
-        self.classification = "file"
+        # the actual list of encryption instances:
+        self.encryption_instances = []
+
         self.encryption = encryption
         self.identifier = None
         self.content_version_id = content_version
         self.contents_finalized = True
-        self.creation_time = datetime.datetime.now()
-        self.modification_time = datetime.datetime.now()
-        self.raw_data = None
+        
+        # actual data chunks:
         self.raw_chunk_data = dict()
         self.chunk_count = 0
-
-        if suggested_identifier != None:  # this is a new item:
-            # this should be pretty free of collisions, given the
-            # suggested identifier:
-            item.identifier = uuid.uuid4() + "-" +\
-                hashlib.sha224(suggested_identifier).hexdigest()
-
-            # new item that isn't finalized:
-            self.contents_finalized = False
-        else: # initialize item from disk
-            pass
-
-        return item
 
     def save(self):
         if self.raw_chunk_data == None or self.identifier == None:
