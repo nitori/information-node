@@ -68,16 +68,12 @@ class ItemChunk(object):
         return self.data
 
 class ItemChunkManager(object):
-    CHUNK_STREAM_LENGTH=32
     def __init__(self, chunk_size, identifier, \
             encryption=None, content_version=1):
-        # the actual list of encryption instances:
-        self.encryption_instances = []
-
         self.encryption = encryption
         self.identifier = None
         self.content_version_id = content_version
-        self.contents_finalized = True
+        self.contents_finalized = False
         
         # actual data chunks:
         self.raw_chunk_data = dict()

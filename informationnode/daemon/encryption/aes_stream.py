@@ -19,10 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import Crypto.Cipher.AES
 import Crypto.Util.Counter
+from informationnode.daemon.encryption.crypto_stream import \
+    CryptoStreamEncryption 
 import os
 import struct
 
-class AESinRSAStreamEncryption(object):
+class AESinRSAStreamEncryption(CryptoStreamEncryption):
     """ This is an AES stream encryption which can store the relevant data
         for encryption (AES key + IV) in a file encrypted with asymetric RSA.
     """
@@ -43,13 +45,13 @@ class AESinRSAStreamEncryption(object):
         self.ctr_iv = struct.unpack("=Q", os.urandom(8))[0]
         self.counter = Crypto.Util.Counter.new(128, initial_value=self.ctr_iv)
         
-        self.initialize_aes_encryption()
+        self.initialize_encryption()
 
-    def initialize_aes_encryption(self):
+    def initialize_encryption(self):
         self.aes_encryption = Crypto.Cipher.AES.new(self.aes_key,
             Crypto.Cipher.AES.MODE_CTR, counter=self.counter)
 
-    def save_encrypted_aes_info(self, rsa_public_identity, path):
+    def save_encrypted_info(self, rsa_public_identity, path):
         """ Save the encrypted AES key + CTR IV to a file where it can be
             loaded from again (but only read by someone with the RSA private
             key corresponding to the specified public key).
@@ -70,7 +72,7 @@ class AESinRSAStreamEncryption(object):
         with open(path, "wb") as f:
             f.write(info_bytes_encrypted)
 
-    def load_encrypted_aes_info(self, rsa_private_identity, path):
+    def load_encrypted_info(self, rsa_private_identity, path):
         """ Load the encrypted AES key + CTR IV again. The specified private
             key must be the corresponding one to the public key used
             previously to encrypt it.
@@ -96,7 +98,7 @@ class AESinRSAStreamEncryption(object):
         # extract aes key:
         self.aes_key = decrypted_info[8:]
 
-        self.initialize_aes_encryption()
+        self.initialize_encryption()
 
     def encrypt(self, data):
         return self.aes_encryption.encrypt(data)

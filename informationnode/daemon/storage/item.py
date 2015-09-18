@@ -24,48 +24,7 @@ import os
 import struct
 import uuid
 
-from informationnode.daemon.encryption.item_encryption import \
-    PasswordEncryption, TargetNodeEncryption
-
-class ItemChunk(object):
-    def __init__(self, item, no):
-        self.item = item
-        self.no = no
-        self.on_disk = False
-
-    def transfer_to_disk(self):
-        """ Transfer the chunk data from memory to disk.
-        """
-        if self.on_disk:
-            return
-        self.on_disk = True
-        del(self.data)
-
-    def transfer_from_disk(self):
-        """ Load chunk data from disk.
-        """
-        if not self.on_disk:
-            return
-        self.on_disk = False
-
-    def delete_data(self):
-        """ Delete this chunk's data, including from disk if any.
-        """
-        raise RuntimeError("not implemented yet")
-
-    def size(self):
-        """ Size of the data contained in thus chunk, or None if not currently
-            known.
-        """
-        return None
-
-    def set_data(self, value):
-        if self.on_disk:
-            self.on_disk = False
-        self.data = value
-
-    def get_data(self):
-        return self.data
+from informationnode.daemon.storage import ItemChunkManager 
 
 class Item(object):
     """ This item structure is the base for all user data stored in an
@@ -95,7 +54,7 @@ class Item(object):
         if suggested_identifier != None:  # this is a new item:
             # this should be pretty free of collisions, given the
             # suggested identifier:
-            item.identifier = uuid.uuid4() + "-" +\
+            self.identifier = uuid.uuid4() + "-" +\
                 hashlib.sha224(suggested_identifier).hexdigest()
 
             # new item that isn't finalized:
@@ -103,7 +62,10 @@ class Item(object):
         else: # initialize item from disk
             pass
 
-        return item
+        self.item_chunk_manager = ItemChunkManager(\
+            self.CHUNK_SIZE, self.identifier, self.encryption,
+            content_version=self.content_version_id)
+        self.item_chunk_manager.contents_finalized = self.contents_finalized 
 
     def save(self):
         if self.raw_chunk_data == None or self.identifier == None:
@@ -134,66 +96,11 @@ class Item(object):
             and/or crypto data will be forgotten again. Unless you unlock, the
             item can neither be read nor modified.
         """
+        self.encryption.lock()
+
+    def open(self):
+        """ Return a file-like object to read and write on this item.
+        """
         return
-
-    def content_chunk_count(self):
-        return self.chunk_count
-
-    def content_get_chunk(self, chunk_no):
-        if chunk_no >= self.chunk_count or chunk_no < 0:
-            raise ValueError('no chunk with id ' + str(chunk_no))
-
-        # load up chunk if not there:
-        if not chunk_no in self.raw_chunk_data:
-            self.raw_chunk_data = ItemChunk(self, chunk_no)
-
-        # get data:
-        data = self.raw_chunk_data[chunk_no].get_data()
-
-        # decrypt if necessary:
-        if self.encryption != None:
-            data = self.encryption.decrypt(data)
-        return data
-
-    def content_set_chunk(self, chunk_no, data):
-        # only allow write access if content hasn't been finalized:
-        if self.contents_finalized:
-            raise RuntimeError('item has been finalized. open a new one '+\
-                'with a newer content version instead.')
-
-        # deal with encryption
-        if self.encryption != None:
-            #
-            pass
-
-        # increase total chunk count if necessary:
-        self.chunk_count = max(self.chunk_count, chunk_no - 1)
-        if chunk_no in self.raw_chunk_data:
-            self.raw_chunk_data[chunk_no].set_data(data)
-            return
-
-        # create new chunk:
-        chunk = ItemChunk(self, chunk_no)
-        chunk.set_data(value)
-        self.raw_chunk_data[chunk_no] = chunk
-
-    def crop_chunks(self, chunk_amount):
-        # only allow write access if content hasn't been finalized:
-        if self.contents_finalized:
-            raise RuntimeError('item has been finalized. open a new one '+\
-                'with a newer content version instead.')
-
-    def content_set_from_file(self, file_path):
-        # only allow write access if content hasn't been finalized:
-        if self.contents_finalized:
-            raise RuntimeError('item has been finalized. open a new one '+\
-                'with a newer content version instead.')
-
-    def content_set_from_bytes(self, bytes):
-        # only allow write access if content hasn't been finalized:
-        if self.contents_finalized:
-            raise RuntimeError('item has been finalized. open a new one '+\
-                'with a newer content version instead.') 
-
 
 
