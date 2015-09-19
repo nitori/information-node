@@ -17,9 +17,32 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
+import os
+
 class CryptoStreamEncryption(object):
+    """ Abstract class for a crypto stream to either encrypt or decrypt a
+        lengthier stream of data with a stream encryption like AES.
+
+        Please note you should use an instance only either for encryption or
+        decryption. If you mix the two uses with one single stream instance,
+        you'll get garbage results.
+
+        This stream does NOT ensure data authenticity, but it provides an HMAC
+        key that is safely stored by save_encrypted_info which can be used for
+        data authenticity computations.
+    """
+    def __init__(self):
+        self.offset = 0
+        self.hmac_key = os.urandom(64)  # 256bits, e.g. for HMAC SHA256
+
     def initialize_encryption(self):
         pass
+
+    def get_hmac_key(self):
+        """ A key which can be used with an HMAC to ensure data
+            authentication.
+        """
+        return self.hmac_key
 
     def save_encrypted_info(self, rsa_public_identity, path):
         """ Save this crypto stream's symmetric key required to decrypt it
@@ -29,7 +52,7 @@ class CryptoStreamEncryption(object):
 
         raise RuntimeError("not implemented by crypto stream class")
 
-    def load_encrypted_aes_info(self, rsa_private_identity, path):
+    def load_encrypted_info(self, rsa_private_identity, path):
         """ Load this crypto stream's symmetric key required to decrypt it
             from a file, decrypted with the private key info of the given
             identity (since it's stored encrypted itself).
@@ -37,16 +60,45 @@ class CryptoStreamEncryption(object):
         raise RuntimeError("not implemented by crypto stream class")
 
     def encrypt(self, data):
-        raise RuntimeError("not implemented by crypto stream class")
+        self.offset += len(data)
+        return None
 
     def decrypt(self, data):
-        raise RuntimeError("not implemented by crypto stream class")
+        self.offset += len(data)
+        return None
 
     def seekable(self):
         """ Whether this crypto stream supports seeking. """
         return False
 
-    def seek(self):
+    def tell(self):
+        """ Get the byte offset this stream is into decryption or encryption.
+            This offset can be reset/changed with seek.
+        """
+        return self.offset        
+
+    def seek_step(self):
+        """ The amount of bytes that can be seeked in one step. For example,
+            if this returns 8 you may only seek to positions 0, 8, 16, ..
+        """
+        return 1
+
+    def seek(self, absolute_offset):
+        """ Tell the crypto stream that you want to resume decryption not from
+            the current position, but instead from the given absolute byte
+            offset in the stream.
+
+            Not all crypto streams allow this - check seekable() to make sure
+            it does.
+
+            However, seeking to 0 to start over decryption from the beginning
+            is always possible.
+        """
+        if absolute_offset == 0:
+            # re-initialize stream to start decryption over from beginning:
+            self.offset = 0
+            self.initialize_encryption()
+            return
         raise RuntimeError("crypto stream not seekable")
 
 
