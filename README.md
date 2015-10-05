@@ -83,6 +83,12 @@ an information node network:
 Please help us expand this list! Volunteer work wanted!
 
 
+# License
+
+This software is available under the terms of GPLv2 or later, with a special
+exception for OpenSSL linking (see source files for details).
+
+
 # How does this all work?
 
 The technology behind the project is the following:
