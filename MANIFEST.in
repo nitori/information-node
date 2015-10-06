@@ -1,0 +1,4 @@
+include AUTHORS.md LICENSE.txt README.md requirements.txt
+include information-node inode-viewer inode-viewer-cli
+recursive-include informationnode/ *.py
+recursive-include docs/ *.md

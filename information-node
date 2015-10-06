@@ -526,430 +526,451 @@ def print_faq():
     print("ALWAYS REMEMBER, nothing is perfectly safe. USE AT YOUR OWN RISK.")
     print("If you have more questions, don't hesitate to seek " +\
         "contact at:\n  https://github.com/JonasT/information-node")
+
+if __name__ == "__main__":
  
-parser.add_argument("action",
-    help=get_action_overall_help_text())
-parser.add_argument("--faq",
-    default=False, action="store_true",
-    help="display a basic FAQ explaining how this tool is useful, " +\
-        "what you should use it for and what not")
-parser.add_argument("--json", default=False, dest="json",
-    action="store_true",
-    help="return the output formatted as JSON instead of plain " +\
-        "human readable text as most commands do per default")
-parser.add_argument("argument", nargs="*",
-    help="argument(s) to given action as specified above")
+    parser.add_argument("action",
+        help=get_action_overall_help_text())
+    parser.add_argument("--faq",
+        default=False, action="store_true",
+        help="display a basic FAQ explaining how this tool is useful, " +\
+            "what you should use it for and what not")
+    parser.add_argument("--json", default=False, dest="json",
+        action="store_true",
+        help="return the output formatted as JSON instead of plain " +\
+            "human readable text as most commands do per default")
+    parser.add_argument("argument", nargs="*",
+        help="argument(s) to given action as specified above")
 
-# display usage if there are literally no arguments at all:
-if len(" ".join(sys.argv[1:]).strip()) == 0:
-    parser.print_usage()
-    sys.exit(1)
+    # display usage if there are literally no arguments at all:
+    if len(" ".join(sys.argv[1:]).strip()) == 0:
+        parser.print_usage()
+        sys.exit(1)
 
-# show faq if --faq is used:
-for arg in sys.argv[1:]:
-    if arg == "--":
-        break
-    if arg == "--faq":
+    # show faq if --faq is used:
+    for arg in sys.argv[1:]:
+        if arg == "--":
+            break
+        if arg == "--faq":
+            print_faq()
+            sys.exit(0)
+
+    # extract all arguments not meant for a subcommand:
+    main_args = []
+    subcmd_args = []
+    for arg in sys.argv[1:]:
+        if not arg.startswith("-"):
+            main_args.append(arg)
+            subcmd_args = sys.argv[1 + len(main_args):]
+            break
+        main_args.append(arg)
+    args = parser.parse_args(main_args)
+    main_args = args
+
+    # print faq if specified somewhere in the later args:
+    if args.faq:
         print_faq()
         sys.exit(0)
 
-# extract all arguments not meant for a subcommand:
-main_args = []
-subcmd_args = []
-for arg in sys.argv[1:]:
-    if not arg.startswith("-"):
-        main_args.append(arg)
-        subcmd_args = sys.argv[1 + len(main_args):]
-        break
-    main_args.append(arg)
-args = parser.parse_args(main_args)
-main_args = args
+    try:
+        from Crypto.PublicKey import RSA
+    except ImportError:
+        print("information-node: error: PyCrypto is not available. "+\
+            "Please install it for Python 3 and try again.")
+        sys.exit(1)
 
-# print faq if specified somewhere in the later args:
-if args.faq:
-    print_faq()
-    sys.exit(0)
+    if args.action == "node":
+        subparser = argparse.ArgumentParser(prog=\
+            os.path.basename(sys.argv[0]) + " node", description=\
+            action_info["node"][3],
+            formatter_class=DoubleLineBreakFormatter)
+        subparser.add_argument("node-folder",
+            help="the location where the node is stored " +\
+            "or should be created at")
+        subparser.add_argument("interface[:port]", nargs="?", default="",
+            help="interface to listen at for remote connections "+\
+                "for links (optional)")
+        subparser.add_argument("--foreground", default=False,
+            action='store_true',
+            help="don't daemonize the data server and run it in another "+\
+                "thread/process. Instead, run it in this terminal in " +\
+                "foreground")
+        args = subparser.parse_args(subcmd_args)
+        setattr(args, "node_folder", getattr(args, "node-folder"))
+        setattr(args, "interface", getattr(args, "interface[:port]"))
 
-try:
-    from Crypto.PublicKey import RSA
-except ImportError:
-    print("information-node: error: PyCrypto is not available. "+\
-        "Please install it for Python 3 and try again.")
-    sys.exit(1)
+        # get interface info:
+        interface_info = ""
+        if len(args.interface) > 0:
+            interface_info = args.interface
 
-if args.action == "node":
-    subparser = argparse.ArgumentParser(prog=\
-        os.path.basename(sys.argv[0]) + " node", description=\
-        action_info["node"][3],
-        formatter_class=DoubleLineBreakFormatter)
-    subparser.add_argument("node-folder",
-        help="the location where the node is stored or should be created at")
-    subparser.add_argument("interface[:port]", nargs="?", default="",
-        help="interface to listen at for remote connections "+\
-            "for links (optional)")
-    subparser.add_argument("--foreground", default=False,
-        action='store_true',
-        help="don't daemonize the data server and run it in another "+\
-            "thread/process. Instead, run it in this terminal in foreground")
-    args = subparser.parse_args(subcmd_args)
-    setattr(args, "node_folder", getattr(args, "node-folder"))
-    setattr(args, "interface", getattr(args, "interface[:port]"))
-
-    # get interface info:
-    interface_info = ""
-    if len(args.interface) > 0:
-        interface_info = args.interface
-
-    # see if interface info is valid:
-    listen_ip = "::0"
-    listen_port = 38950
-    if len(interface_info) > 0:
-        colon_pos = interface_info.rfind(":")
-        ip_part = ""
-        port = None
-        if colon_pos < 0:
-            if interface_info.find(".") < 0:
-                print("information-node: error: supplied listen interface "+\
-                    "is not a valid ip address", file=sys.stderr)
-                sys.exit(1)
-            ip_part = interface_info
-        else:
-            port_str = None
-            if interface_info.find(":") != colon_pos:
-                # must be ipv6. verify proper square brackets:
-                if (not interface_info[0] == "[") or \
-                        (not interface_info[colon_pos - 1] == "]"):
-                    # not []: but maybe it's [..:..:..]?
-                    if not interface_info.endswith("]"):
-                        print("information-node: error: supplied listen " +\
-                            "interface is not a valid ip address - did you "+\
-                            "use square brackets for ipv6?", file=sys.stderr)
-                        sys.exit(1)
-                    ip_part = interface_info[1:-1]
-                else:
-                    ip_part = interface_info[1:colon_pos - 1]
-                    port_str = interface_info[colon_pos + 1:]
+        # see if interface info is valid:
+        listen_ip = "::0"
+        listen_port = 38950
+        if len(interface_info) > 0:
+            colon_pos = interface_info.rfind(":")
+            ip_part = ""
+            port = None
+            if colon_pos < 0:
+                if interface_info.find(".") < 0:
+                    print("information-node: error: " +\
+                        "supplied listen interface "+\
+                        "is not a valid ip address", file=sys.stderr)
+                    sys.exit(1)
+                ip_part = interface_info
             else:
-                ip_part = interface_info[0:colon_pos]
-                port_str = interface_info[colon_pos + 1:]
-            if port_str != None:
+                port_str = None
+                if interface_info.find(":") != colon_pos:
+                    # must be ipv6. verify proper square brackets:
+                    if (not interface_info[0] == "[") or \
+                            (not interface_info[colon_pos - 1] == "]"):
+                        # not []: but maybe it's [..:..:..]?
+                        if not interface_info.endswith("]"):
+                            print("information-node: error: " +\
+                                "supplied listen " +\
+                                "interface is not a valid ip address " +\
+                                "- did you "+\
+                                "use square brackets for ipv6?",
+                                file=sys.stderr)
+                            sys.exit(1)
+                        ip_part = interface_info[1:-1]
+                    else:
+                        ip_part = interface_info[1:colon_pos - 1]
+                        port_str = interface_info[colon_pos + 1:]
+                else:
+                    ip_part = interface_info[0:colon_pos]
+                    port_str = interface_info[colon_pos + 1:]
+                if port_str != None:
+                    try:
+                        port = int(port_str)
+                    except ValueError:
+                        print("information-node: error: supplied listen " +\
+                            "interface has invalid port - not a number",\
+                            file=sys.stderr)
+                        sys.exit(1)
+            # ok, check if this is a valid ip and port range:
+            if port != None and (port < 1 or port > 65535):
+                print("information-node: error: supplied listen interface " +\
+                    "has invalid port - exceeds valid port range",
+                    file=sys.stderr) 
+                sys.exit(1)
+
+            # check for valid ip:
+            try:
+                import ipaddress
+                adr = ipaddress.ip_address(ip_part)
+            except ValueError:
+                print("information-node: error: supplied listen interface "+\
+                    "has invalid address - not a valid IP address",
+                    file=sys.stderr)
+                sys.exit(1)
+
+            listen_ip = ip_part
+            if port != None:
+                listen_port = port
+
+        node_folder = os.path.abspath(args.node_folder)
+
+        # check if node directory is valid:
+        (result, msg) = check_if_node_dir(node_folder, allow_new=True)
+        if result != True:
+            print("information-node: error: " + msg, file=sys.stderr)
+            sys.exit(1)
+             
+        # check if node dir is empty and we need to initialise it:
+        if len(os.listdir(node_folder)) == 0:
+            print("information-node: info: " +\
+                "creating new information node at location " +\
+                node_folder + "...")
+
+            # create item storage directory:
+            os.mkdir(os.path.join(node_folder, "storage"))
+
+            # create and store a new identity:
+            identity = Identity()
+            identity.save_to_file(os.path.join(node_folder,
+                "identity.secret"))
+
+            # create log directory:
+            os.mkdir(os.path.join(node_folder, "logs"))
+
+        # check if pid file exists:
+        (result, msg) = check_if_node_runs(node_folder) 
+        if result == None:
+            print("information-node: error: " + msg, file=sys.stderr)
+            sys.exit(1)
+        if result:
+            print("information-node: info: data server for this node is " +\
+                "running with pid " + str(msg))
+            print("information-node: info: nothing to do.")
+            sys.exit(0)
+
+        print("information-node: info: " +\
+            "preparing communications socket for daemon...")
+
+        # on unix, create api file socket at this point (for viewer access):
+        if platform.system().lower() != "windows":
+            if os.path.exists(os.path.join(node_folder, "api_access.sock")):
+                print("information-node: warning: removing stale file socket",
+                    file=sys.stderr)
+                os.remove(os.path.join(node_folder, "api_access.sock"))
+            api_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            api_socket.bind(os.path.join(node_folder, "api_access.sock"))
+
+        # on windows, open up api socket at any port, and write port to file:
+        if platform.system().lower() == "windows" and args.foreground:
+            api_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+            api_socket.bind(("::0", 0))
+            port = api_socket.getsockname()[1]
+            f = open(os.path.join(node_folder, "api_access.port"), "wb")
+            f.write(str(port).encode("utf8", "ignore"))
+            f.close()
+
+        # a helper function to wait until a pidfile was made:
+        def wait_for_pid_file():
+            while True:
+                if not os.path.exists(os.path.join(node_folder, "pidfile")):
+                    time.sleep(0.5)
+                else:
+                    break
+
+        # handle daemonizing:
+        print("information-node: info: launching information-node daemon...")
+        if platform.system().lower() == "windows":
+            # on windows we cannot fork, so we need to run ourselves again as
+            # a new detached process (unless we _are_ that detached process):
+            if not args.foreground:
+                DETACHED_PROCESS = 8
+                subprocess.Popen([sys.executable, __file__, 
+                    "node", "--foreground", node_folder],
+                    creationflags=DETACHED_PROCESS,
+                    close_fds=True)
+                wait_for_pid_file()
+                print("information-node: info: data server is running!")
+                sys.exit(0)
+        else:
+            # this should be a unix system:
+            # fork should be available and work as expected. -> fork
+            if not args.foreground:
                 try:
-                    port = int(port_str)
-                except ValueError:
-                    print("information-node: error: supplied listen " +\
-                        "interface has invalid port - not a number",\
+                    pid = os.fork()
+                    if pid > 0:
+                        # this is the parent process. exit:
+                        wait_for_pid_file()
+                        print("information-node: info: " +\
+                            "data server is running!")
+                        sys.exit(0)
+                except OSError as e:
+                    print("information-node: error: fork failed.",
                         file=sys.stderr)
                     sys.exit(1)
-        # ok, check if this is a valid ip and port range:
-        if port != None and (port < 1 or port > 65535):
-            print("information-node: error: supplied listen interface " +\
-                "has invalid port - exceeds valid port range",
-                file=sys.stderr) 
-            sys.exit(1)
+                # disable stdin/stdout:
+                devnull = [os.open(os.devnull, os.O_RDWR) for x in [1, 2]]
+                os.dup2(devnull[0], 1)
+                os.dup2(devnull[1], 2)
 
-        # check for valid ip:
-        try:
-            import ipaddress
-            adr = ipaddress.ip_address(ip_part)
-        except ValueError:
-            print("information-node: error: supplied listen interface "+\
-                "has invalid address - not a valid IP address",
-                file=sys.stderr)
-            sys.exit(1)
-
-        listen_ip = ip_part
-        if port != None:
-            listen_port = port
-
-    node_folder = os.path.abspath(args.node_folder)
-
-    # check if node directory is valid:
-    (result, msg) = check_if_node_dir(node_folder, allow_new=True)
-    if result != True:
-        print("information-node: error: " + msg, file=sys.stderr)
-        sys.exit(1)
-         
-    # check if node dir is empty and we need to initialise it:
-    if len(os.listdir(node_folder)) == 0:
-        print("information-node: info: " +\
-            "creating new information node at location " +\
-            node_folder + "...")
-
-        # create item storage directory:
-        os.mkdir(os.path.join(node_folder, "storage"))
-
-        # create and store a new identity:
-        identity = Identity()
-        identity.save_to_file(os.path.join(node_folder, "identity.secret"))
-
-        # create log directory:
-        os.mkdir(os.path.join(node_folder, "logs"))
-
-    # check if pid file exists:
-    (result, msg) = check_if_node_runs(node_folder) 
-    if result == None:
-        print("information-node: error: " + msg, file=sys.stderr)
-        sys.exit(1)
-    if result:
-        print("information-node: info: data server for this node is " +\
-            "running with pid " + str(msg))
-        print("information-node: info: nothing to do.")
-        sys.exit(0)
-
-    print("information-node: info: " +\
-        "preparing communications socket for daemon...")
-
-    # on unix, create api file socket at this point (for viewer access):
-    if platform.system().lower() != "windows":
-        if os.path.exists(os.path.join(node_folder, "api_access.sock")):
-            print("information-node: warning: removing stale file socket",
-                file=sys.stderr)
-            os.remove(os.path.join(node_folder, "api_access.sock"))
-        api_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        api_socket.bind(os.path.join(node_folder, "api_access.sock"))
-
-    # on windows, open up api socket at any port, and write port to file:
-    if platform.system().lower() == "windows" and args.foreground:
-        api_socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-        api_socket.bind(("::0", 0))
-        port = api_socket.getsockname()[1]
-        f = open(os.path.join(node_folder, "api_access.port"), "wb")
-        f.write(str(port).encode("utf8", "ignore"))
+        # create a pid file:
+        pid_bytes = str(os.getpid()).encode("utf-8", "ignore")
+        f = open(os.path.join(node_folder, "pidfile"), "wb")
+        f.write(pid_bytes)
         f.close()
 
-    # a helper function to wait until a pidfile was made:
-    def wait_for_pid_file():
-        while True:
-            if not os.path.exists(os.path.join(node_folder, "pidfile")):
-                time.sleep(0.5)
+        # if we arrive here, we are in the daemon process/thread. run daemon:
+        Daemon(node_folder).run(api_socket)
+    elif args.action == "ping":
+        subparser = argparse.ArgumentParser(prog=\
+            os.path.basename(sys.argv[0]) + " ping", description=\
+            action_info["ping"][3],
+            formatter_class=DoubleLineBreakFormatter)
+        subparser.add_argument("node-folder",
+            help="the node of which the data server should be pinged")
+        args = subparser.parse_args(subcmd_args)
+        setattr(args, "node_folder", getattr(args, "node-folder"))
+
+        # get api socket for the node:
+        (result, socket) = get_api_socket_for_node(args.node_folder)
+        if not result:
+            # whoops, didn't work.
+            if not main_args.json:
+                print("inode-viewer-cli: error: " + socket, file=sys.stderr)
             else:
-                break
-
-    # handle daemonizing:
-    print("information-node: info: launching information-node daemon...")
-    if platform.system().lower() == "windows":
-        # on windows we cannot fork, so we need to run ourselves again as
-        # a new detached process (unless we _are_ that detached process):
-        if not args.foreground:
-            DETACHED_PROCESS = 8
-            subprocess.Popen([sys.executable, __file__, 
-                "node", "--foreground", node_folder],
-                creationflags=DETACHED_PROCESS,
-                close_fds=True)
-            wait_for_pid_file()
-            print("information-node: info: data server is running!")
-            sys.exit(0)
-    else:
-        # this should be a unix system:
-        # fork should be available and work as expected. -> fork
-        if not args.foreground:
-            try:
-                pid = os.fork()
-                if pid > 0:
-                    # this is the parent process. exit:
-                    wait_for_pid_file()
-                    print("information-node: info: data server is running!")
-                    sys.exit(0)
-            except OSError as e:
-                print("information-node: error: fork failed.", file=sys.stderr)
-                sys.exit(1)
-            # disable stdin/stdout:
-            devnull = [os.open(os.devnull, os.O_RDWR) for x in [1, 2]]
-            os.dup2(devnull[0], 1)
-            os.dup2(devnull[1], 2)
-
-    # create a pid file:
-    pid_bytes = str(os.getpid()).encode("utf-8", "ignore")
-    f = open(os.path.join(node_folder, "pidfile"), "wb")
-    f.write(pid_bytes)
-    f.close()
-
-    # if we arrive here, we are in the daemon process/thread. run daemon:
-    Daemon(node_folder).run(api_socket)
-elif args.action == "ping":
-    subparser = argparse.ArgumentParser(prog=\
-        os.path.basename(sys.argv[0]) + " ping", description=\
-        action_info["ping"][3],
-        formatter_class=DoubleLineBreakFormatter)
-    subparser.add_argument("node-folder",
-        help="the node of which the data server should be pinged")
-    args = subparser.parse_args(subcmd_args)
-    setattr(args, "node_folder", getattr(args, "node-folder"))
-
-    # get api socket for the node:
-    (result, socket) = get_api_socket_for_node(args.node_folder)
-    if not result:
-        # whoops, didn't work.
-        if not main_args.json:
-            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
-        else:
-            print('{"action" : "client_error, "error_info" : '+\
-                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
-                 + '"}')
-        sys.exit(1)
-
-    # ping the daemon:
-    send_json(socket, {"action" : "ping"})
-    response = recv_json(socket)
-    socket.close()
-    if response["action"] == "pong":
-        if not main_args.json:
-            print("Pong received.")
-        else:
-            print(response)
-        sys.exit(0)
-    if not main_args.json:
-        print("inode-viewer-cli: error: invalid response.", file=sys.stderr)
-    else:
-        print('{"action" : "client_error, "error_info" : '+\
-            '"Invalid response received."}')
-    sys.exit(1)
-elif args.action == "shutdown":
-    subparser = argparse.ArgumentParser(prog=\
-        os.path.basename(sys.argv[0]) + " shutdown", description=\
-        action_info["shutdown"][3],
-        formatter_class=DoubleLineBreakFormatter)
-    subparser.add_argument("node-folder",
-        help="the node of which the data server should be shutdown")
-    args = subparser.parse_args(subcmd_args)
-    setattr(args, "node_folder", getattr(args, "node-folder"))
-
-    # check whether the node is already shutdown:
-    (result, msg) = check_if_node_dir(args.node_folder)
-    if result == True:
-        (result, msg) = check_if_node_runs(args.node_folder)
-        if result == False:
-            # it is, nothing to do.
-            if main_args.json:
-                print("{}")
-            sys.exit(0)
-
-    # get api socket for the node:
-    (result, socket) = get_api_socket_for_node(args.node_folder)
-    if not result:
-        # whoops, didn't work.
-        if not main_args.json:
-            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
-        else:
-            print('{"action" : "client_error, "error_info" : '+\
-                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
-                 + '"}')
-        sys.exit(1)
-
-    # send shutdown signal:
-    send_json(socket, {"action" : "shutdown"})
-    socket.close()
-
-    # wait for the daemon to remove the pidfile:
-    while os.path.exists(os.path.join(args.node_folder, "pidfile")):
-        time.sleep(0.2)
-
-    # wait a short moment for the process to go down (although it'd be already
-    # safe to launch a new data server instance at this point):
-    time.sleep(0.5)
-
-    print("{}")
-    sys.exit(0)
-elif args.action == "raw-cmd":
-    subparser = argparse.ArgumentParser(prog=\
-        os.path.basename(sys.argv[0]) + " raw-cmd", description=\
-        action_info["raw-cmd"][3],
-        formatter_class=DoubleLineBreakFormatter)
-    subparser.add_argument("node-folder",
-        help="the node to which this command should be sent")
-    subparser.add_argument("--bytes", default="-1",
-        help="the size of the input JSON you will provide in "+\
-        "exact bytes. Providing this speeds up input processing " +\
-        "for large inputs considerably.")
-    args = subparser.parse_args(subcmd_args)
-    setattr(args, "node_folder", getattr(args, "node-folder"))
-
-    # get input bytes length if specified:
-    try:
-        input_bytes = int(args.bytes)
-    except ValueError:
-        print("inode-viewer-cli: error: --bytes needs to be an integer",
-            file=sys.stderr)
-        sys.exit(1)
-    if input_bytes < -1 or input_bytes == 0:
-        print("inode-viewer-cli: error: input length in bytes needs "+\
-            "to be positive number", file=sys.stderr)
-        sys.exit(1)
-
-    # get api socket for the node:
-    (result, socket) = get_api_socket_for_node(args.node_folder)
-    if not result:
-        # whoops, didn't work.
-        if not main_args.json:
-            print("inode-viewer-cli: error: " + socket, file=sys.stderr)
-        else:
-            print('{"action" : "client_error, "error_info" : '+\
-                '"couldn\'t obtain socket: ' + socket.replace('"', "\\\"")\
-                 + '"}')
-        sys.exit(1)
-    
-    # read JSON input from command line:
-    if input_bytes == -1:
-        # Supecial case where we don't know the input length.
-        # We need to periodically check if what we already got is valid
-        # complete JSON.
-        if platform.system().lower() == "windows":
-            print("inode-viewer-cli: error: raw-cmd without specified "+\
-                "input byte length not supported on windows. " +\
-                "Use --bytes", file=sys.stderr)
+                print('{"action" : "client_error, "error_info" : '+\
+                    '"couldn\'t obtain socket: ' + \
+                    socket.replace('"', "\\\"")\
+                    + '"}')
             sys.exit(1)
-        input_selector = selectors.DefaultSelector()
-        input_selector.register(sys.stdin, EVENT_READ)
-        input_data = ""
-        while True:
-            events = input_selector.select()
-            for key, mask in events:
-                try:
-                    data = key.fileobj.read(1024)
-                except OSError:
-                    # end of stream or similar.
-                    json_obj = json.loads(input_data)
-                    break
-                if len(data) == 0:
-                    # end of stream.
-                    json_obj = json.loads(input_data)
-                    break
-                input_data += data
-                # see if this is already valid json:
-                try:
-                    json_obj = json.loads(input_data)
-                    break
-                except ValueError:
-                    continue  # nope. continue parsing
-    else:
-        # read the known input size:
-        input_data = sys.stdin.read(input_bytes)
-        json_obj = json.loads(input_data)
 
-    # send over socket:
-    send_json(socket, json_obj) 
-    
-    # get response:
-    response_obj = recv_json(socket)
-    socket.close()
-
-    # print response:
-    print(json.dumps(response_obj))
-    sys.exit(0)
-else:
-    if args.action in action_info:
-        print("Dear user,")
-        print("")
-        print("This software is still \033[1mwork in progress\033[21m.\n"+\
-            "Sadly, this action is \033[1mnot available yet\033[21m" +\
-            " in this version.")
-        print("")
-        print("Best regards,\nThe developers")
-        print("")
-        print("information-node: error: action UNIMPLEMENTED: " + args.action,
-            file=sys.stderr)
+        # ping the daemon:
+        send_json(socket, {"action" : "ping"})
+        response = recv_json(socket)
+        socket.close()
+        if response["action"] == "pong":
+            if not main_args.json:
+                print("Pong received.")
+            else:
+                print(response)
+            sys.exit(0)
+        if not main_args.json:
+            print("inode-viewer-cli: error: invalid response.",
+                file=sys.stderr)
+        else:
+            print('{"action" : "client_error, "error_info" : '+\
+                '"Invalid response received."}')
         sys.exit(1)
-    print("information-node: error: unknown action: " + args.action,
-        file=sys.stderr)
+    elif args.action == "shutdown":
+        subparser = argparse.ArgumentParser(prog=\
+            os.path.basename(sys.argv[0]) + " shutdown", description=\
+            action_info["shutdown"][3],
+            formatter_class=DoubleLineBreakFormatter)
+        subparser.add_argument("node-folder",
+            help="the node of which the data server should be shutdown")
+        args = subparser.parse_args(subcmd_args)
+        setattr(args, "node_folder", getattr(args, "node-folder"))
+
+        # check whether the node is already shutdown:
+        (result, msg) = check_if_node_dir(args.node_folder)
+        if result == True:
+            (result, msg) = check_if_node_runs(args.node_folder)
+            if result == False:
+                # it is, nothing to do.
+                if main_args.json:
+                    print("{}")
+                sys.exit(0)
+
+        # get api socket for the node:
+        (result, socket) = get_api_socket_for_node(args.node_folder)
+        if not result:
+            # whoops, didn't work.
+            if not main_args.json:
+                print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+            else:
+                print('{"action" : "client_error, "error_info" : '+\
+                    '"couldn\'t obtain socket: ' +\
+                    socket.replace('"', "\\\"")\
+                    + '"}')
+            sys.exit(1)
+
+        # send shutdown signal:
+        send_json(socket, {"action" : "shutdown"})
+        socket.close()
+
+        # wait for the daemon to remove the pidfile:
+        while os.path.exists(os.path.join(args.node_folder, "pidfile")):
+            time.sleep(0.2)
+
+        # Wait a short moment for the process to go down (although
+        # it should be already safe to launch a new data server instance
+        # at this point) to fulfill user expectations that the daemon
+        # process really is gone from the process list once this script exits
+        # (although that wouldn't be strictly required):
+        time.sleep(0.5)
+
+        print("{}")
+        sys.exit(0)
+    elif args.action == "raw-cmd":
+        subparser = argparse.ArgumentParser(prog=\
+            os.path.basename(sys.argv[0]) + " raw-cmd", description=\
+            action_info["raw-cmd"][3],
+            formatter_class=DoubleLineBreakFormatter)
+        subparser.add_argument("node-folder",
+            help="the node to which this command should be sent")
+        subparser.add_argument("--bytes", default="-1",
+            help="the size of the input JSON you will provide in "+\
+            "exact bytes. Providing this speeds up input processing " +\
+            "for large inputs considerably.")
+        args = subparser.parse_args(subcmd_args)
+        setattr(args, "node_folder", getattr(args, "node-folder"))
+
+        # get input bytes length if specified:
+        try:
+            input_bytes = int(args.bytes)
+        except ValueError:
+            print("inode-viewer-cli: error: --bytes needs to be an integer",
+                file=sys.stderr)
+            sys.exit(1)
+        if input_bytes < -1 or input_bytes == 0:
+            print("inode-viewer-cli: error: input length in bytes needs "+\
+                "to be positive number", file=sys.stderr)
+            sys.exit(1)
+
+        # get api socket for the node:
+        (result, socket) = get_api_socket_for_node(args.node_folder)
+        if not result:
+            # whoops, didn't work.
+            if not main_args.json:
+                print("inode-viewer-cli: error: " + socket, file=sys.stderr)
+            else:
+                print('{"action" : "client_error, "error_info" : '+\
+                    '"couldn\'t obtain socket: ' +\
+                    socket.replace('"', "\\\"")\
+                    + '"}')
+            sys.exit(1)
+        
+        # read JSON input from command line:
+        if input_bytes == -1:
+            # Supecial case where we don't know the input length.
+            # We need to periodically check if what we already got is valid
+            # complete JSON.
+            if platform.system().lower() == "windows":
+                print("inode-viewer-cli: error: raw-cmd without specified "+\
+                    "input byte length not supported on windows. " +\
+                    "Use --bytes", file=sys.stderr)
+                sys.exit(1)
+            input_selector = selectors.DefaultSelector()
+            input_selector.register(sys.stdin, EVENT_READ)
+            input_data = ""
+            while True:
+                events = input_selector.select()
+                for key, mask in events:
+                    try:
+                        data = key.fileobj.read(1024)
+                    except OSError:
+                        # end of stream or similar.
+                        json_obj = json.loads(input_data)
+                        break
+                    if len(data) == 0:
+                        # end of stream.
+                        json_obj = json.loads(input_data)
+                        break
+                    input_data += data
+                    # see if this is already valid json:
+                    try:
+                        json_obj = json.loads(input_data)
+                        break
+                    except ValueError:
+                        continue  # nope. continue parsing
+        else:
+            # read the known input size:
+            input_data = sys.stdin.read(input_bytes)
+            json_obj = json.loads(input_data)
+
+        # send over socket:
+        send_json(socket, json_obj) 
+        
+        # get response:
+        response_obj = recv_json(socket)
+        socket.close()
+
+        # print response:
+        print(json.dumps(response_obj))
+        sys.exit(0)
+    else:
+        if args.action in action_info:
+            print("Dear user,")
+            print("")
+            print("This software is still \033[1mwork in " +\
+                "progress\033[21m.\n"+\
+                "Sadly, this action is \033[1mnot available " +\
+                "yet\033[21m" +\
+                " in this version.")
+            print("")
+            print("Best regards,\nThe developers")
+            print("")
+            print("information-node: error: action UNIMPLEMENTED: " +\
+                args.action,
+                file=sys.stderr)
+            sys.exit(1)
+        print("information-node: error: unknown action: " + args.action,
+            file=sys.stderr)
 
 

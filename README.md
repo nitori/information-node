@@ -85,8 +85,8 @@ Please help us expand this list! Volunteer work wanted!
 
 # License
 
-This software is available under the terms of GPLv2 or later, with a special
-exception for OpenSSL linking (see source files for details).
+This software is available under the terms of GPLv2 or later.
+See LICENSE.txt for details.
 
 
 # How does this all work?
@@ -99,7 +99,7 @@ The technology behind the project is the following:
   (the files are encrypted with an AES key which itself is encrypted using
   RSA)
 
-* PyOpenSSL - https://pypi.python.org/pypi/pyOpenSSL
+* python-gnutls / GnuTLS - http://www.gnutls.org/
   (TLS encryption for node-to-node communication)
 
 * PyGObject/GTK3 - https://wiki.gnome.org/PyGObject

@@ -1,1 +1,2 @@
-PyCrypto
+PyCrypto>=2.6.1
+python-gnutls>=2.0.1

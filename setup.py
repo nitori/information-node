@@ -2,9 +2,14 @@
 import os
 from setuptools import setup, find_packages
 import shutil
+import sys
 import textwrap
 
-with open("requirements.txt") as f:
+if sys.version_info[0] == 3 and sys.version_info[1] < 3:
+    sys.stderr.write("Sorry, Python < 3.3 is not supported")
+    sys.exit(1)
+
+with open(os.path.join(os.path.dirname(__file__), "requirements.txt")) as f:
     required = [l for l in f.read().splitlines() if not l.startswith("#")\
         and len(l.strip()) > 0]
 

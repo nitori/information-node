@@ -33,6 +33,12 @@ You must obey the GNU General Public License in all respects
 
 '''
 
+""" This executable provides a graphical viewer that can open up information
+    nodes and show/browse the contents. This is the standard tool you would
+    usually want to use for casual use. (the other provided tools are mainly
+    for  advanced or automated command line management)
+"""
+
 import argparse
 import logging
 import os
@@ -53,145 +59,147 @@ parser.add_argument("--debug-history",
 parser.add_argument("-v", "--verbose",
     default=False, action="store_true", dest="verbose",
     help="print out more verbose debugging output of activities")
-args = parser.parse_args()
 
-if args.verbose:
-    logging.basicConfig(level=logging.DEBUG)
-else:
-    logging.basicConfig(level=logging.WARNING)
+if __name__ == "__main__":
+    args = parser.parse_args()
 
-# check whether gtk is present:
-gtk_available = True
-try:
-    from gi.repository import Gtk
-except ImportError:
-    gtk_available = False
-
-if not gtk_available:
-    try:
-        import tkinter
-    except ImportError:
-        print("FATAL ERROR: *** tkinter missing. ***", file=sys.stderr)
-        sys.exit(1)
-    import tkinter.messagebox as tkMessageBox
-    if platform.system().lower() == "windows":
-        # display notice and install it
-        root = tkinter.Tk()
-        root.withdraw()
-        tkMessageBox.showinfo("IMPORTANT",
-            textwrap.dedent('''\
-            
-            *** IMPORTANT PLEASE READ ***
-            
-            GTK+3 missing.
-            
-            Dear user,
-            
-            you are almost done running the information node viewer!
-            However, you will need to install GTK+3 first.
-            
-            1. Download PyGObject/GTK3 from here: https://wiki.gnome.org/PyGObject (pick "Windows installers with Gtk3 support" and then the newest version)
-            
-            2. During install, click "Add Path" and enter this location:
-                -> ''') + os.path.dirname(sys.executable) + "\n" + \
-            textwrap.dedent('''\
-            
-            3. During install, when shown the packages choices,
-               make sure to check GTK+3
-               
-            4. When you are done, launch the viewer again.'''))
-        sys.exit(1)
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
     else:
-        # display notice and install it
-        root = tkinter.Tk()
-        root.withdraw()
-        tkMessageBox.showinfo("Error",
-            textwrap.dedent('''\
-            GTK+3/PyGObject is missing. Please install it.
-            '''))
-        sys.exit(1)    
-        
-# check whether PyCrypto is present:
-pycrypto_available = True
-try:
-    from Crypto.PublicKey import RSA
-except ImportError:
-    pycrypto_available = False
+        logging.basicConfig(level=logging.WARNING)
 
-if not pycrypto_available:
+    # check whether gtk is present:
+    gtk_available = True
     try:
-        import tkinter
+        from gi.repository import Gtk
     except ImportError:
-        print("FATAL ERROR: *** tkinter missing. ***", file=sys.stderr)
-        sys.exit(1)
-    import tkinter.messagebox as tkMessageBox
-    if platform.system().lower() == "windows":
-        # display notice and install it
-        root = tkinter.Tk()
-        root.withdraw()
-        tkMessageBox.showinfo("IMPORTANT",
-            textwrap.dedent('''\
-            
-            *** IMPORTANT PLEASE READ ***
-            
-            PyCrypto missing.
-            
-            Dear user,
-            
-            you are almost done running the information node viewer!
-            However, you will need to install PyCrypto first.
-            
-            1. Download PyCrypto from here: http://www.voidspace.org.uk/python/modules.shtml#pycrypto
-            (on the site, make sure to pick latest version)
-            
-            2. Pick the download for amd64 and this python version:
-                -> ''') + sys.version + "\n" + \
-            textwrap.dedent('''\
-            
-            3. During install, pick the python with this "Python Directory":
-                -> ''') + os.path.dirname(sys.executable) + "\n" + \
-            textwrap.dedent('''\
-            
-            4. When you are done, launch the viewer again.'''))
-        sys.exit(1)
-    else:
-        # display notice and install it
-        root = tkinter.Tk()
-        root.withdraw()
-        tkMessageBox.showinfo("Error",
-            textwrap.dedent('''\
-            PyCrypto is missing. Please install it.
-            '''))
-        sys.exit(1)  
+        gtk_available = False
 
-from informationnode.uilib import uilib_main_loop, uilib_quit
-from informationnode.client.ui.nodewindow import NodeWindow
-from informationnode.client.api.nodeactions import NodeActions
+    if not gtk_available:
+        try:
+            import tkinter
+        except ImportError:
+            print("FATAL ERROR: *** tkinter missing. ***", file=sys.stderr)
+            sys.exit(1)
+        import tkinter.messagebox as tkMessageBox
+        if platform.system().lower() == "windows":
+            # display notice and install it
+            root = tkinter.Tk()
+            root.withdraw()
+            tkMessageBox.showinfo("IMPORTANT",
+                textwrap.dedent('''\
+                
+                *** IMPORTANT PLEASE READ ***
+                
+                GTK+3 missing.
+                
+                Dear user,
+                
+                you are almost done running the information node viewer!
+                However, you will need to install GTK+3 first.
+                
+                1. Download PyGObject/GTK3 from here: https://wiki.gnome.org/PyGObject (pick "Windows installers with Gtk3 support" and then the newest version)
+                
+                2. During install, click "Add Path" and enter this location:
+                    -> ''') + os.path.dirname(sys.executable) + "\n" + \
+                textwrap.dedent('''\
+                
+                3. During install, when shown the packages choices,
+                   make sure to check GTK+3
+                   
+                4. When you are done, launch the viewer again.'''))
+            sys.exit(1)
+        else:
+            # display notice and install it
+            root = tkinter.Tk()
+            root.withdraw()
+            tkMessageBox.showinfo("Error",
+                textwrap.dedent('''\
+                GTK+3/PyGObject is missing. Please install it.
+                '''))
+            sys.exit(1)    
+            
+    # check whether PyCrypto is present:
+    pycrypto_available = True
+    try:
+        from Crypto.PublicKey import RSA
+    except ImportError:
+        pycrypto_available = False
 
-class App(object):
-    def __init__(self, keep_history=False):
-        self.windows = []
-        self.actions = NodeActions(self, keep_history=keep_history)
+    if not pycrypto_available:
+        try:
+            import tkinter
+        except ImportError:
+            print("FATAL ERROR: *** tkinter missing. ***", file=sys.stderr)
+            sys.exit(1)
+        import tkinter.messagebox as tkMessageBox
+        if platform.system().lower() == "windows":
+            # display notice and install it
+            root = tkinter.Tk()
+            root.withdraw()
+            tkMessageBox.showinfo("IMPORTANT",
+                textwrap.dedent('''\
+                
+                *** IMPORTANT PLEASE READ ***
+                
+                PyCrypto missing.
+                
+                Dear user,
+                
+                you are almost done running the information node viewer!
+                However, you will need to install PyCrypto first.
+                
+                1. Download PyCrypto from here: http://www.voidspace.org.uk/python/modules.shtml#pycrypto
+                (on the site, make sure to pick latest version)
+                
+                2. Pick the download for amd64 and this python version:
+                    -> ''') + sys.version + "\n" + \
+                textwrap.dedent('''\
+                
+                3. During install, pick the python with this "Python Directory":
+                    -> ''') + os.path.dirname(sys.executable) + "\n" + \
+                textwrap.dedent('''\
+                
+                4. When you are done, launch the viewer again.'''))
+            sys.exit(1)
+        else:
+            # display notice and install it
+            root = tkinter.Tk()
+            root.withdraw()
+            tkMessageBox.showinfo("Error",
+                textwrap.dedent('''\
+                PyCrypto is missing. Please install it.
+                '''))
+            sys.exit(1)  
 
-    def window_close_event(self, win):
-        self.windows.remove(win)
-        if len(self.windows) == 0:
-            uilib_quit()
+    from informationnode.uilib import uilib_main_loop, uilib_quit
+    from informationnode.client.ui.nodewindow import NodeWindow
+    from informationnode.client.api.nodeactions import NodeActions
 
-    def add_window(self, win):
-        win.register("close", self.window_close_event)
-        self.windows.append(win)
-        win.show()
-        return win
+    class App(object):
+        def __init__(self, keep_history=False):
+            self.windows = []
+            self.actions = NodeActions(self, keep_history=keep_history)
 
-    def add_node_window(self, node_path):
-        new_window = NodeWindow(self, node_path)
-        return self.add_window(new_window)
+        def window_close_event(self, win):
+            self.windows.remove(win)
+            if len(self.windows) == 0:
+                uilib_quit()
 
-    def run(self):
-        self.add_node_window(None)
-        uilib_main_loop()
+        def add_window(self, win):
+            win.register("close", self.window_close_event)
+            self.windows.append(win)
+            win.show()
+            return win
 
-app = App(keep_history=args.debug_history)
-app.run()
+        def add_node_window(self, node_path):
+            new_window = NodeWindow(self, node_path)
+            return self.add_window(new_window)
+
+        def run(self):
+            self.add_node_window(None)
+            uilib_main_loop()
+
+    app = App(keep_history=args.debug_history)
+    app.run()
 
