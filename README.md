@@ -1,5 +1,5 @@
 
-# Information node
+# information-node
 
 This project offers a new concept of **information nodes** for keeping your
 data synchronized between various locations (cloud storage if you will) and

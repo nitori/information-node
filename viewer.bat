@@ -14,19 +14,6 @@ REM GNU General Public License for more details.
 REM
 REM You should have received a copy of the GNU General Public License
 REM along with this program.  If not, see <http://www.gnu.org/licenses/>.
-REM
-REM   In addition, as a special exception, the copyright holders give
-REM     permission to link the code of portions of this program with the
-REM     OpenSSL library under certain conditions as described in each
-REM     individual source file, and distribute linked combinations
-REM     including the two.
-REM   You must obey the GNU General Public License in all respects
-REM     for all of the code used other than OpenSSL.  If you modify
-REM     file(s) with this exception, you may extend this exception to your
-REM     version of the file(s), but you are not obligated to do so.  If you
-REM     do not wish to do so, delete this exception statement from your
-REM     version.  If you delete this exception statement from all source
-REM     files in the program, then also delete it here.
 
 @echo off
 
