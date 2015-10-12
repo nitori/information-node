@@ -1,5 +1,5 @@
 
-import tcp
+import informationnode.tcp.server
 import unittest
 
 class TCPTest(unittest.TestCase):
@@ -13,5 +13,6 @@ class TCPTest(unittest.TestCase):
         pass
 
     def test_main(self):
+        server = informationnode.tcp.server.TCPServer()
         self.assertEqual(1, 2)
 

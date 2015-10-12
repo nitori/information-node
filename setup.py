@@ -11,8 +11,7 @@ def require_py33():
     if sys.version_info[0] < 3 or sys.version_info[1] < 3:
         sys.stderr.write("Sorry, Python < 3.3 is not supported\n")
         sys.exit(1)
-
-require_py33()
+#require_py33()
 
 # import requirements.txt for info:
 with open(os.path.join(os.path.dirname(__file__), "requirements.txt")) as f:
