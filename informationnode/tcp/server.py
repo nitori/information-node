@@ -67,7 +67,7 @@ class TCPServer(object):
                 [])
         else:
             self.use_tls = False
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         if self.use_tls:
             self.tls_session = ServerSessionFactory(self.socket,
@@ -88,10 +88,11 @@ class TCPServer(object):
 class TCPWrappedSocket(object):
     def __init__(self, tcp_handler, socket, tls_session=None, uses_tls=False,
             server_and_auto_accept=False):
-        self.connection = socket_or_session
-        self.uses_tls = use_tls
+        self.socket = socket
+        self.uses_tls = uses_tls
         self.tls_session = tls_session
         self.server_and_auto_accept = server_and_auto_accept
+        self.connection = tls_session if uses_tls else socket
 
     def set_receive_callback(self, callback):
         self.receive_callback = callback
@@ -114,41 +115,46 @@ class TCPWrappedSocket(object):
     def set_receive_callback(self, callback):
         self.receive_callback = callback
 
-
 class _TCPConnectionsHandler(object):
     def __init__(self):
         self.connections = dict()
         self.recv_selector = DefaultSelector()
         self.send_selector = DefaultSelector()
 
-    def add_plain_connection(self, socket, receive_callback, server=False):
-        tinfo = TCPWrappedSocket(self, socket, server_and_auto_accept=server)
-        self.connections[socket] = tinfo
-
-    def add_tls_connection(self, socket, tls_session, receive_callback,
+    def add_plain_connection(self, socket, receive_callback=None,
             server=False):
-        tinfo = TCPWrappedSocket(self, socket, tls_session, uses_tls=True,
+        wrappedsocket = TCPWrappedSocket(self, socket,
             server_and_auto_accept=server)
-        self.connections.add[tls_session] = tinfo
-        self.connections.add[socket] = tinfo
+        self.connections[socket] = wrappedsocket
+        if receive_callback != None:
+            wrappedsocket.set_receive_callback(receive_callback)
+
+    def add_tls_connection(self, socket, tls_session, receive_callback=None,
+            server=False):
+        wrappedsocket = TCPWrappedSocket(self, socket, tls_session,
+            uses_tls=True, server_and_auto_accept=server)
+        self.connections.add[tls_session] = wrappedsocket
+        self.connections.add[socket] = wrappedsocket
         gnutls.gnutls_transport_set_push_function(
             tls_session, self._tls_custom_io_send)
         gnutls.gnutls_transport_set_pull_function(
             self.tls_session, self._tls_custom_io_recv)
+        if receive_callback != None:
+            wrappedsocket.set_receive_callback(receive_callback)
 
     def remove_connection_by_socket(self, socket):
-        tinfo = self.connections[socket]
-        if tinfo.uses_tls:
-            tls_session = tinfo.tls_session
+        wrappedsocket = self.connections[socket]
+        if wrappedsocket.uses_tls:
+            tls_session = wrappedsocket.tls_session
             del(self.connections[tls_session])
         del(self.connections[socket])
-        del(tinfo)
+        del(wrappedsocket)
 
     def remove_connection_by_tls_session(self, tls_session):
-        tinfo = self.connections[tls_session]
-        del(self.connections[tinfo.socket])
+        wrappedsocket = self.connections[tls_session]
+        del(self.connections[wrappedsocket.socket])
         del(self.connections[tls_session])
-        del(tinfo)
+        del(wrappedsocket)
 
     def _tls_custom_io_send(self, transport_ptr, data, data_len):
         if platform.system().lower() == "windows":

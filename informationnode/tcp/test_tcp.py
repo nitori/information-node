@@ -13,6 +13,6 @@ class TCPTest(unittest.TestCase):
         pass
 
     def test_main(self):
-        server = informationnode.tcp.server.TCPServer()
+        server = informationnode.tcp.server.TCPServer(port=8765)
         self.assertEqual(1, 2)
 

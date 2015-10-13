@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 '''
 
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from Crypto import Random
 import json
@@ -85,31 +87,45 @@ class Identity(object):
                 self.public_key = None
                 raise ValueError("this RSA key doesn't meet the required " +\
                     "minimum bit size for proper encryption")
+        if self.private_key != None:
+            self.cipher = PKCS1_OAEP.new(self.private_key.key,
+                hashAlgo=SHA256)
+        else:
+            self.cipher = PKCS1_OAEP.new(self.public_key.key,
+                hashAlgo=SHA256)
 
     def encrypt(self, value):
         """ Encrypt a self.size() bits value with this identity.
 
-            The length must not exceed self.size() bits.
+            The length must not exceed self.size() bits minus the length for
+            PKCS OAEP padding.
+
             If you want to encrypt longer values, use this to encrypt an AES
             key instead and use AES to encrypt your actual data stream.
 
             Returns the encrypted bytes.
         """
-        if len(value) > math.floor(self.public_key.size() / 8.0):
+        if len(value) > self.maximum_encryption_length():
             raise ValueError("value is too large to be encrypted with this "+\
                 "RSA key")
-        return self.public_key.encrypt(value)
+        return self.cipher.encrypt(value)
+
+    def maximum_encryption_length(self):
+        """ Get the maximum amount of bytes that can be encrypted with this
+            RSA key, taking the PKCS OAEP padding into account.
+        """
+        total_bytes = math.floor(self.public_key.size() / 8.0)
+        return total_bytes - 2 - 2 * (256 / 8)
 
     def size(self):
-        """ Get the amount of bits that can be encrypted or decrypted with
-            this RSA identity.
+        """ Get the the size of this RSA key in bits. (also called the modulo)
         """
         if self.private_key != None:
            return min(self.private_key.size(), self.public_key.size())
         return self.public_key.size()
 
     def decrypt(self, value):
-        """ Decrypt a maximum <length> bit long value with this identity.
+        """ Decrypt a value with this identity.
 
             This can only be done if this identity contains the private key
             part (which means it cannot be just instantiated from the pure
@@ -118,10 +134,7 @@ class Identity(object):
             Returns the decrypted bytes, or raises a ValueError if decryption
             failed.
         """
-        if len(value) > math.floor(self.public_key.size() / 8.0):
-            raise ValueError("value is too large to be encrypted with this "+\
-                "RSA key")
-        return self.private_key.decrypt(value)
+        return self.cipher.decrypt(value)
 
     def save_to_file(self, path, passphrase=None):
         """ Save the identity to a file. Please note this includes the
